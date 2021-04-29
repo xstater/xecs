@@ -1,7 +1,7 @@
 use crate::World;
 use crate::Component;
 
-pub type EntityId = u32;
+pub type EntityId = usize;
 
 pub struct Entity<'a>{
     world : &'a mut World,
@@ -19,5 +19,9 @@ impl<'a> Entity<'a> {
     pub fn with<T : Component>(self,component: T) -> Entity<'a> {
         self.world.add_component_for_entity::<T>(self.entity_id,component);
         self
+    }
+
+    pub fn id(&self) -> EntityId {
+        self.entity_id
     }
 }

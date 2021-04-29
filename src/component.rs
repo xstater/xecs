@@ -1,5 +1,6 @@
 use crate::EntityId;
 use std::num::NonZeroUsize;
+use std::any::Any;
 
 pub trait Component : Send + Sync + 'static {}
 
@@ -21,35 +22,39 @@ impl<T : Component> Manager<T> {
         }
     }
 
-    pub(in crate) fn len(&self) -> usize {
-        self.dense.len()
+    pub(in crate) fn exists(&self,entity_id : EntityId) -> bool {
+        if entity_id < self.sparse.len() {
+            self.sparse[entity_id].is_some()
+        }else{
+            false
+        }
     }
 
     pub(in crate) fn new_component(&mut self,entity : EntityId,component : T){
         //enlarge sparse
-        while self.sparse.len() <= (entity as usize) {
+        while self.sparse.len() <= entity {
             self.sparse.push(None);
         }
-        if let Some(index) = self.sparse[entity as usize] {
+        if let Some(index) = self.sparse[entity] {
             //already exists
             //overwrite
             self.components[index.get() - 1] = component;
         }else{
             //have not yet
-            self.sparse[entity as usize] = NonZeroUsize::new(self.dense.len() + 1);
+            self.sparse[entity] = NonZeroUsize::new(self.dense.len() + 1);
             self.dense.push(entity);
             self.components.push(component);
         }
     }
 
     pub(in crate) fn remove_component(&mut self,entity : EntityId) -> Option<T> {
-        if self.sparse.len() < (entity as usize) {
+        if self.sparse.len() < entity {
             return None;
         }
-        if let Some(index) = self.sparse[entity as usize] {
+        if let Some(index) = self.sparse[entity] {
             let index = index.get() - 1;
             self.sparse.swap(self.dense[index] as usize, *self.dense.last().unwrap() as usize);
-            self.sparse[entity as usize] = None;
+            self.sparse[entity] = None;
             self.dense.swap_remove(index);
             return Some(self.components.swap_remove(index));
         }
@@ -83,7 +88,7 @@ impl<T : Component> Manager<T> {
 
 #[cfg(test)]
 mod tests{
-    use crate::component::Manager;
+    use crate::component::{Manager};
 
     #[test]
     fn test(){
@@ -109,4 +114,5 @@ mod tests{
         assert_eq!(m1.remove_component(3),Some('c'));
         println!("{:?}",m1);
     }
+
 }

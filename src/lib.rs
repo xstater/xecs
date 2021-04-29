@@ -1,8 +1,7 @@
-use std::num::NonZeroU32;
-
 mod world;
 mod component;
 mod entity;
+mod query;
 
 pub use entity::EntityId;
 pub use world::World;
