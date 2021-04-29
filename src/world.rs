@@ -2,6 +2,7 @@ use std::any::{TypeId, Any};
 use crate::component::{self, Component};
 use crate::EntityId;
 use crate::entity::Entity;
+use crate::query::Query;
 
 pub struct World {
     destroyed_count : usize,
@@ -115,6 +116,10 @@ impl World {
 
     pub fn entities_count(&self) -> usize {
         self.components_count.len() - self.destroyed_count
+    }
+
+    pub fn make_query<T>(&mut self) -> Query<'_,T>{
+        Query::from_world(self)
     }
 
 }
