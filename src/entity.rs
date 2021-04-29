@@ -17,7 +17,7 @@ impl<'a> Entity<'a> {
     }
 
     pub fn with<T : Component>(self,component: T) -> Entity<'a> {
-        self.world.add_component_for_entity::<T>(self.entity_id,component);
+        self.world.add_component::<T>(self.entity_id, component);
         self
     }
 

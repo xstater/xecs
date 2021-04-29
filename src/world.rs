@@ -58,7 +58,7 @@ impl World {
         self
     }
 
-    pub fn add_component_for_entity<T : Component>(&mut self, entity_id : EntityId,component : T){
+    pub fn add_component<T : Component>(&mut self, entity_id : EntityId, component : T){
         for (type_id,ptr) in &mut self.components_managers {
             if *type_id == TypeId::of::<component::Manager<T>>() {
                 let manager = ptr.downcast_mut::<component::Manager<T>>().unwrap();
@@ -72,7 +72,7 @@ impl World {
         panic!("Type <{}> have not been registered !",std::any::type_name::<T>());
     }
 
-    pub fn remove_component_from_entity<T : Component>(&mut self,entity_id : EntityId) -> Option<T> {
+    pub fn remove_component<T : Component>(&mut self, entity_id : EntityId) -> Option<T> {
         for (type_id,ptr) in &mut self.components_managers {
             if *type_id == TypeId::of::<component::Manager<T>>() {
                 let manager = ptr.downcast_mut::<component::Manager<T>>().unwrap();
@@ -143,9 +143,9 @@ mod tests{
         for c in 'a'..='z' {
             world.create_entity(Shit(c));
         }
-        world.remove_component_from_entity::<Shit>(0);
-        world.remove_component_from_entity::<Shit>(3);
-        world.remove_component_from_entity::<Shit>(5);
+        world.remove_component::<Shit>(0);
+        world.remove_component::<Shit>(3);
+        world.remove_component::<Shit>(5);
 
 
         println!("destroyed:{},id:{:?},counts:{:?}",world.destroyed_count,world.destroyed_id,world.components_count);
