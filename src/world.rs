@@ -4,29 +4,62 @@ use std::any::TypeId;
 use std::alloc::Layout;
 use crate::component::{self,Component};
 use crate::EntityId;
+use crate::entity::Entity;
 
+#[derive(Debug)]
 pub struct World {
-    entities : Vec<EntityId>,
+    next_id : EntityId,
     component_manager : Vec<(TypeId,Layout,*mut u8)>,
 }
 
 impl World {
     pub fn new() -> World {
         World {
-            entities : vec![],
+            next_id : 0,
             component_manager: vec![]
         }
+    }
+
+    pub fn create_entity(&mut self) -> Entity<'_> {
+        self.next_id += 1;
+        Entity::new(self,self.next_id - 1)
     }
 
     pub fn register<T : Component>(&mut self) -> &mut Self{
         let layout = Layout::new::<component::Manager<T>>();
         let tid = TypeId::of::<T>();
         let ptr = unsafe { std::alloc::alloc(layout) };
+        if ptr.is_null() {
+            std::alloc::handle_alloc_error(layout);
+        }
         unsafe {
-            *(ptr as * mut component::Manager<T>) = component::Manager::<T>::new();
+            *(ptr as *mut component::Manager<T>) = component::Manager::<T>::new();
         };
         self.component_manager.push((tid,layout,ptr));
         self
+    }
+
+    pub fn add_component_for_entity<T : Component>(&mut self, entity_id : EntityId,component : T){
+        for (type_id,_,ptr) in &self.component_manager {
+            if *type_id == TypeId::of::<T>(){
+                let ptr = *ptr as *mut component::Manager<T>;
+                let manager = unsafe { &mut *ptr };
+                manager.new_component(entity_id,component);
+                return;
+            }
+        }
+        panic!("Type <{}> have not been registered !",std::any::type_name::<T>());
+    }
+
+    pub fn components<T : Component>(&self) -> &[T] {
+        for (type_id,_,ptr) in &self.component_manager {
+            if *type_id == TypeId::of::<T>(){
+                let ptr = *ptr as *mut component::Manager<T>;
+                let manager = unsafe { &*ptr };
+                return manager.components()
+            }
+        }
+        panic!("Type <{}> have not been registered !",std::any::type_name::<T>());
     }
 
 }
@@ -46,13 +79,32 @@ mod tests{
 
     #[test]
     fn test(){
+        #[derive(Debug)]
         struct Fuck(i32);
+        #[derive(Debug)]
         struct Shit(char);
 
+        println!("here");
+
         let mut world = World::new();
+        println!("{:?}",world);
         world
-            .register::<Fuck>()
-            .register::<Shit>();
+            // .register::<Fuck>()
+            // .register::<Shit>()
+        ;
+        println!("{:?}",world);
+
+        // world.create_entity()
+        //     .with(Shit('a'));
+        // world.create_entity()
+        //     .with(Fuck(2))
+        //     .with(Shit('c'));
+        // for c in 'a'..='z' {
+        //     world.create_entity()
+        //         .with(Shit(c));
+        // }
+        //
+        // println!("{:?}\n{:?}",world.components::<Shit>(),world.components::<Fuck>());
 
         // world.create_entity().with(Fuck(2)).build();
         // let entity = world
