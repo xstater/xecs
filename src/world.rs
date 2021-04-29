@@ -89,8 +89,8 @@ mod tests{
         let mut world = World::new();
         println!("{:?}",world);
         world
-            // .register::<Fuck>()
-            // .register::<Shit>()
+            .register::<Fuck>()
+            .register::<Shit>()
         ;
         println!("{:?}",world);
 
