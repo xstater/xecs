@@ -1,11 +1,12 @@
 mod world;
-mod component;
 mod entity;
 mod query;
 
+pub trait Component : Send + Sync + 'static {}
+impl<T : Send + Sync + 'static> Component for T {}
+
 pub use entity::EntityId;
 pub use world::World;
-pub use component::Component;
 
 #[cfg(test)]
 mod tests {
