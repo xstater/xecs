@@ -11,5 +11,5 @@ dependencies = [
 
 [[package]]
 name = "xsparseset"
-version = "0.1.1"
-source = "git+https://github.com/xstater/xsparseset#246b90a5c982364daa1d4c82e7c752eed5d47b56"
+version = "0.1.2"
+source = "git+https://github.com/xstater/xsparseset#b7c3a74641847d3edff0faf07582ffe51cf9212e"

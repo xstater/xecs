@@ -9,6 +9,7 @@ use xsparseset::SparseSet;
 use std::ops::Range;
 use std::collections::{HashMap, HashSet};
 
+#[derive(Debug)]
 pub(in crate) struct Group{
     pub(in crate) types : HashSet<TypeId>,
     pub(in crate) range : Range<usize>,
@@ -108,6 +109,7 @@ impl World {
                 }
             }
         }
+        self.groups.push(group);
     }
 
     pub fn remove_group<A : Component,B : Component>(&mut self){
@@ -144,6 +146,9 @@ impl World {
     }
 
     pub fn add_component<T : Component>(&mut self, entity_id : EntityId, component : T){
+        for group in self.group_filter_iter_mut::<T>() {
+            group.need_update = true;
+        }
         if let Some(ptr) = self.components.get_mut(&TypeId::of::<T>()) {
             let manager = ptr.downcast_mut::<SparseSet<EntityId,T>>().unwrap();
             if !manager.exist(entity_id) {
@@ -156,6 +161,9 @@ impl World {
     }
 
     pub fn remove_component<T : Component>(&mut self, entity_id : EntityId) -> Option<T> {
+        for group in self.group_filter_iter_mut::<T>() {
+            group.need_update = true;
+        }
         if let Some(ptr) = self.components.get_mut(&TypeId::of::<T>()) {
             let manager = ptr.downcast_mut::<SparseSet<EntityId,T>>().unwrap();
             if manager.exist(entity_id) {
@@ -173,13 +181,13 @@ impl World {
         panic!("Type <{}> have not been registered !",std::any::type_name::<T>());
     }
 
-    fn components<T : Component>(&self) -> Option<&SparseSet<EntityId,T>> {
+    pub(in crate) fn components<T : Component>(&self) -> Option<&SparseSet<EntityId,T>> {
         self.components
             .get(&TypeId::of::<T>())?
             .downcast_ref::<SparseSet<EntityId,T>>()
     }
 
-    fn components_mut<T : Component>(&mut self) -> Option<&mut SparseSet<EntityId,T>> {
+    pub(in crate) fn components_mut<T : Component>(&mut self) -> Option<&mut SparseSet<EntityId,T>> {
         self.components
             .get_mut(&TypeId::of::<T>())?
             .downcast_mut::<SparseSet<EntityId,T>>()
@@ -207,7 +215,6 @@ updated pos:4 5
 #[cfg(test)]
 mod tests{
     use crate::world::World;
-    use crate::Component;
 
     #[test]
     fn test(){
