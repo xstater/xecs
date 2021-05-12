@@ -90,31 +90,12 @@ impl World {
             need_update: false
         };
         // re-order by the shorter one
-        {
+        let len = {
             let mut component_a = self.components_mut::<A>().unwrap();
             let mut component_b = self.components_mut::<B>().unwrap();
-            let len_a = component_a.len();
-            let len_b = component_b.len();
-            if len_a < len_b {
-                for index_a in 0..len_a {
-                    let entity = unsafe { component_a.entities().get_unchecked(index_a) };
-                    if let Some(index_b) = component_b.get_index(*entity) {
-                        component_a.swap_by_index(index_a, group.range.end);
-                        component_b.swap_by_index(index_b, group.range.end);
-                        group.range.end += 1;
-                    }
-                }
-            } else {
-                for index_b in 0..len_b {
-                    let entity = unsafe { component_b.entities().get_unchecked(index_b) };
-                    if let Some(index_a) = component_a.get_index(*entity) {
-                        component_a.swap_by_index(index_a, group.range.end);
-                        component_b.swap_by_index(index_b, group.range.end);
-                        group.range.end += 1;
-                    }
-                }
-            }
-        }
+            component_a.make_group_in(&mut component_b,0)
+        };
+        group.range.end = len;
         self.groups.push(RefCell::new(group));
     }
 
