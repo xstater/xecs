@@ -26,7 +26,7 @@ impl<'a,A,B> Query2<'a,A,B>
     where A : Component,
           B : Component{
 
-    fn query(self) -> Iter<'a,A,B> {
+    pub fn query(self) -> Iter<'a,A,B> {
         let set_a = self.world.components::<A>().unwrap();
         let set_b = self.world.components::<B>().unwrap();
         if let Some(group) = self.world.group::<A,B>() {
