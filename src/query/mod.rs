@@ -1,8 +1,7 @@
-mod query;
-mod query_with;
+pub mod query;
+pub mod query2;
 
-pub use query::{Query,QueryEntities};
-pub use query_with::{QueryWith,QueryEntitiesWith};
+pub use query::{Query,QueryEntity};
 
 #[cfg(test)]
 mod tests{
@@ -27,7 +26,16 @@ mod tests{
         world.create_entity(6u32);
         world.create_entity('d');
 
+        // for (eid,u) in world.make_query::<u32>().entities().query_mut() {
+        //     *u = eid as u32;
+        // }
+
         for u in world.make_query::<u32>().query() {
+            print!("{} ",u)
+        }
+        println!();
+
+        for u in world.make_query::<char>().query() {
             print!("{:?} ",u);
         }
         println!();

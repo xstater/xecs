@@ -4,10 +4,11 @@ use std::any::{TypeId, Any};
 use crate::Component;
 use crate::EntityId;
 use crate::entity::Entity;
-use crate::query::Query;
+use crate::query::{Query};
 use xsparseset::SparseSet;
 use std::ops::Range;
 use std::collections::{HashMap, HashSet};
+use std::cell::{RefCell, Ref, RefMut};
 
 #[derive(Debug)]
 pub(in crate) struct Group{
@@ -17,11 +18,11 @@ pub(in crate) struct Group{
 }
 
 pub struct World {
-    destroyed_count : usize,
-    destroyed_id : Option<EntityId>,
-    components_count: Vec<usize>,
-    components: HashMap<TypeId,Box<dyn Any>>,//Box<SparseSet<EntityId,Component>>
-    groups : Vec<Group>
+    pub(in crate) destroyed_count : usize,
+    pub(in crate) destroyed_id : Option<EntityId>,
+    pub(in crate) components_count: Vec<usize>,
+    pub(in crate) components: HashMap<TypeId,RefCell<Box<dyn Any>>>,//Box<SparseSet<EntityId,Component>>
+    pub(in crate) groups : Vec<RefCell<Group>>
 }
 
 impl World {
@@ -60,7 +61,7 @@ impl World {
         }else{
             self.components.insert(
                 TypeId::of::<T>(),
-                Box::new(SparseSet::<EntityId, T>::new()));
+                RefCell::new(Box::new(SparseSet::<EntityId, T>::new())));
         }
         self
     }
@@ -70,6 +71,7 @@ impl World {
         let tid_b = TypeId::of::<B>();
         //panic if A or B already in group
         for group in &self.groups {
+            let group = group.borrow();
             if group.types.contains(&tid_a) {
                 panic!("Component {} is already in group!",std::any::type_name::<A>())
             }
@@ -87,34 +89,39 @@ impl World {
             range: (0..0),
             need_update: false
         };
-        //re-order by the shorter one
-        let len_a = self.components::<A>().unwrap().len();
-        let len_b = self.components::<B>().unwrap().len();
-        if len_a < len_b {
-            for index_a in 0..len_a {
-                let entity = unsafe { self.components::<A>().unwrap().entities().get_unchecked(index_a) };
-                if let Some(index_b) = self.components::<B>().unwrap().get_index(*entity) {
-                    self.components_mut::<A>().unwrap().swap_by_index(index_a,group.range.end);
-                    self.components_mut::<B>().unwrap().swap_by_index(index_b,group.range.end);
-                    group.range.end += 1;
+        // re-order by the shorter one
+        {
+            let mut component_a = self.components_mut::<A>().unwrap();
+            let mut component_b = self.components_mut::<B>().unwrap();
+            let len_a = component_a.len();
+            let len_b = component_b.len();
+            if len_a < len_b {
+                for index_a in 0..len_a {
+                    let entity = unsafe { component_a.entities().get_unchecked(index_a) };
+                    if let Some(index_b) = component_b.get_index(*entity) {
+                        component_a.swap_by_index(index_a, group.range.end);
+                        component_b.swap_by_index(index_b, group.range.end);
+                        group.range.end += 1;
+                    }
                 }
-            }
-        }else{
-            for index_b in 0..len_b {
-                let entity = unsafe { self.components::<B>().unwrap().entities().get_unchecked(index_b) };
-                if let Some(index_a) = self.components::<A>().unwrap().get_index(*entity) {
-                    self.components_mut::<A>().unwrap().swap_by_index(index_a,group.range.end);
-                    self.components_mut::<B>().unwrap().swap_by_index(index_b,group.range.end);
-                    group.range.end += 1;
+            } else {
+                for index_b in 0..len_b {
+                    let entity = unsafe { component_b.entities().get_unchecked(index_b) };
+                    if let Some(index_a) = component_a.get_index(*entity) {
+                        component_a.swap_by_index(index_a, group.range.end);
+                        component_b.swap_by_index(index_b, group.range.end);
+                        group.range.end += 1;
+                    }
                 }
             }
         }
-        self.groups.push(group);
+        self.groups.push(RefCell::new(group));
     }
 
     pub fn remove_group<A : Component,B : Component>(&mut self){
         let mut index = None;
         for (i,group) in self.groups.iter().enumerate() {
+            let group = group.borrow();
             if group.types.len() == 2
             && group.types.contains(&TypeId::of::<A>())
             && group.types.contains(&TypeId::of::<B>()) {
@@ -129,27 +136,22 @@ impl World {
         }
     }
 
-    pub(in crate) fn group_filter_iter<T : Component>(&self) -> impl Iterator<Item = &Group>{
+    pub(in crate) fn group_filter_iter<T : Component>(&self) -> impl Iterator<Item = &RefCell<Group>>{
         self.groups
             .iter()
             .filter(|group|{
-                group.types.contains(&TypeId::of::<T>())
-            })
-    }
-
-    pub(in crate) fn group_filter_iter_mut<T : Component>(&mut self) -> impl Iterator<Item = &mut Group>{
-        self.groups
-            .iter_mut()
-            .filter(|group| {
+                let group = (*group).borrow();
                 group.types.contains(&TypeId::of::<T>())
             })
     }
 
     pub fn add_component<T : Component>(&mut self, entity_id : EntityId, component : T){
-        for group in self.group_filter_iter_mut::<T>() {
+        for group in self.group_filter_iter::<T>() {
+            let mut group = group.borrow_mut();
             group.need_update = true;
         }
         if let Some(ptr) = self.components.get_mut(&TypeId::of::<T>()) {
+            let mut ptr = ptr.borrow_mut();
             let manager = ptr.downcast_mut::<SparseSet<EntityId,T>>().unwrap();
             if !manager.exist(entity_id) {
                 self.components_count[entity_id] += 1;
@@ -161,10 +163,12 @@ impl World {
     }
 
     pub fn remove_component<T : Component>(&mut self, entity_id : EntityId) -> Option<T> {
-        for group in self.group_filter_iter_mut::<T>() {
+        for group in self.group_filter_iter::<T>() {
+            let mut group = group.borrow_mut();
             group.need_update = true;
         }
         if let Some(ptr) = self.components.get_mut(&TypeId::of::<T>()) {
+            let mut ptr = ptr.borrow_mut();
             let manager = ptr.downcast_mut::<SparseSet<EntityId,T>>().unwrap();
             if manager.exist(entity_id) {
                 self.components_count[entity_id] -= 1;
@@ -181,24 +185,53 @@ impl World {
         panic!("Type <{}> have not been registered !",std::any::type_name::<T>());
     }
 
-    pub(in crate) fn components<T : Component>(&self) -> Option<&SparseSet<EntityId,T>> {
-        self.components
+    pub(in crate) fn components<T : Component>(&self) -> Option<Ref<'_,SparseSet<EntityId,T>>> {
+        let ref_box = self.components
             .get(&TypeId::of::<T>())?
-            .downcast_ref::<SparseSet<EntityId,T>>()
+            .borrow();
+        Some(Ref::map(ref_box,|component|{
+            component.downcast_ref::<SparseSet<EntityId,T>>().unwrap()
+        }))
+    }
+    pub(in crate) fn components_mut<T : Component>(&self) -> Option<RefMut<'_,SparseSet<EntityId,T>>> {
+        let ref_box = self.components
+            .get(&TypeId::of::<T>())?
+            .borrow_mut();
+        Some(RefMut::map(ref_box,|component|{
+            component.downcast_mut::<SparseSet<EntityId,T>>().unwrap()
+        }))
     }
 
-    pub(in crate) fn components_mut<T : Component>(&mut self) -> Option<&mut SparseSet<EntityId,T>> {
-        self.components
-            .get_mut(&TypeId::of::<T>())?
-            .downcast_mut::<SparseSet<EntityId,T>>()
+    pub(in crate) fn group<A : Component,B : Component>(&self) -> Option<Ref<'_,Group>> {
+        self.groups.iter().find(|group|{
+            let group = (*group).borrow();
+            group.types.len() == 2 &&
+            group.types.contains(&TypeId::of::<A>()) &&
+            group.types.contains(&TypeId::of::<B>())
+        }).map(|group|{
+            group.borrow()
+        })
     }
 
+    pub(in crate) fn group_mut<A : Component,B : Component>(&self) -> Option<RefMut<'_,Group>> {
+        self.groups.iter().find(|group|{
+            let group = (*group).borrow();
+            group.types.len() == 2 &&
+                group.types.contains(&TypeId::of::<A>()) &&
+                group.types.contains(&TypeId::of::<B>())
+        }).map(|group|{
+            group.borrow_mut()
+        })
+    }
     pub fn entities_count(&self) -> usize {
         self.components_count.len() - self.destroyed_count
     }
 
     pub fn make_query<T : Component>(&mut self) -> Query<'_,T>{
-        Query::from_world(self)
+        Query{
+            world: self,
+            _marker: Default::default()
+        }
     }
 
 }
@@ -215,6 +248,7 @@ updated pos:4 5
 #[cfg(test)]
 mod tests{
     use crate::world::World;
+    use crate::{Component};
 
     #[test]
     fn test(){
@@ -304,7 +338,6 @@ mod tests{
             .with('c');
         world.create_entity(6u32);
         world.create_entity('d');
-
         println!("u32 :{:?}",world.components::<u32>().unwrap().entities());
         println!("char:{:?}",world.components::<char>().unwrap().entities());
 
@@ -316,6 +349,7 @@ mod tests{
 
         let mut iter = world.group_filter_iter::<char>();
         if let Some(group) = iter.next() {
+            let group = group.borrow();
             println!("Group len:{}",group.range.len());
         }else{
             panic!("Cannot find any group has <{}>",std::any::type_name::<char>())
