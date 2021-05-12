@@ -44,5 +44,11 @@ mod tests{
             print!("({},{:?}), ",eid,ch);
         }
         println!();
+        
+        for (ch,u) in world.make_query::<char>().with::<u32>().query() {
+            print!("({:?},{})",ch,u);
+        }
+        println!();
     }
 }
+
