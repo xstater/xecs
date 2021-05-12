@@ -71,7 +71,7 @@ impl<'a,A,B> Iterator for Iter<'a,A,B> {
                     let entity_id = self.set_a.entities()[index_a];
                     self.data_a_ptr.1 = unsafe { self.data_a_ptr.1.offset(1) };
                     if let Some(index_b) = self.set_b.get_index(entity_id) {
-                        self.data_b_ptr.1 = unsafe{ self.data_b_ptr.0.offset(index_b) };
+                        self.data_b_ptr.1 = unsafe{ self.data_b_ptr.0.offset(index_b as isize) };
                         return Some((unsafe{&*ptr_a},unsafe{&*self.data_b_ptr.1}));
                     }
                 }
