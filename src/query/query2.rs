@@ -66,7 +66,7 @@ impl<'a,A,B> Iterator for Iter<'a,A,B> {
         match &self.group_info {
             GroupInfo::A => {
                 let index_a = unsafe{ self.data_a_ptr.1.offset_from(self.data_a_ptr.0) } as usize;
-                if index_b < self.set_a.len() {
+                if index_a < self.set_a.len() {
                     let ptr_a = self.data_a_ptr.1;
                     let entity_id = self.set_a.entities()[index_a];
                     self.data_a_ptr.1 = unsafe { self.data_a_ptr.1.offset(1) };
