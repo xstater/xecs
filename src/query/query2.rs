@@ -65,13 +65,14 @@ impl<'a,A,B> Iterator for Iter<'a,A,B> {
     fn next(&mut self) -> Option<Self::Item> {
         match &self.group_info {
             GroupInfo::A => {
-                let index = unsafe{ self.data_a_ptr.1.offset_from(self.data_a_ptr.0) } as usize;
-                if index < self.set_a.len() {
+                let index_a = unsafe{ self.data_a_ptr.1.offset_from(self.data_a_ptr.0) } as usize;
+                if index_b < self.set_a.len() {
                     let ptr_a = self.data_a_ptr.1;
-                    let entity_id = self.set_a.entities()[index];
+                    let entity_id = self.set_a.entities()[index_a];
                     self.data_a_ptr.1 = unsafe { self.data_a_ptr.1.offset(1) };
-                    if let Some(b) = self.set_b.get(entity_id) {
-                        Some((unsafe{&*ptr_a},b))
+                    if let Some(index_b) = self.set_b.get_index(entity_id) {
+                        self.data_b_ptr.1 = unsafe{ self.data_b_ptr.0.offset(index_b) };
+                        return Some((unsafe{&*ptr_a},unsafe{&*self.data_b_ptr.1}));
                     }
                 }
                 None
