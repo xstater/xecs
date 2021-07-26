@@ -1,235 +1,199 @@
-extern crate xsparseset;
-
-use std::any::{TypeId, Any};
-use crate::Component;
-use crate::EntityId;
-use crate::entity::Entity;
-use crate::query::{Query};
-use xsparseset::SparseSet;
-use std::ops::Range;
-use std::collections::{HashMap, HashSet};
+use crate::{EntityId, Component};
+use std::collections::HashMap;
+use std::any::TypeId;
 use std::cell::{RefCell, Ref, RefMut};
-
-#[derive(Debug)]
-pub(in crate) struct Group{
-    pub(in crate) types : HashSet<TypeId>,
-    pub(in crate) range : Range<usize>,
-    pub(in crate) need_update : bool
-}
+use crate::components::ComponentStorage;
+use xsparseset::SparseSet;
+use crate::entity::EntityRef;
 
 pub struct World {
-    pub(in crate) destroyed_count : usize,
-    pub(in crate) destroyed_id : Option<EntityId>,
-    pub(in crate) components_count: Vec<usize>,
-    pub(in crate) components: HashMap<TypeId,RefCell<Box<dyn Any>>>,//Box<SparseSet<EntityId,Component>>
-    pub(in crate) groups : Vec<RefCell<Group>>
+    // entity_flags[0] : Because the ID 0 is not a valid ID,
+    //     so the first one can be used to store the last removed ID
+    // entity_flags[id] : has 2 state below:
+    // None -> This ID is not available now
+    //     It means that this ID has already been used
+    // Some(id) -> This ID is available
+    //      'id' is the next available ID
+    entity_flags : Vec<Option<EntityId>>,
+    // Box<SparseSet<EntityId,Component>>
+    components: HashMap<TypeId,RefCell<Box<dyn ComponentStorage>>>,
 }
 
 impl World {
     pub fn new() -> World {
         World {
-            destroyed_count : 0,
-            destroyed_id : None,
-            components_count: Vec::new(),
-            components: HashMap::new(),
-            groups : Vec::new()
+            entity_flags : vec![None],
+            components: Default::default()
         }
     }
 
-    pub fn create_entity<T : Component>(&mut self,component : T) -> Entity<'_> {
-        let id = if let Some(id) = self.destroyed_id {
-            self.destroyed_count -= 1;
-            if self.destroyed_count == 0 {
-                self.destroyed_id = None;
-            }else{
-                self.destroyed_id = Some(self.components_count[id]);
-            }
-            self.components_count[id] = 0;
-            id
-        }else {
-            self.components_count.push(0);
-            self.components_count.len() - 1
-        };
-        Entity::new(self, id)
-            .with(component)
+    pub fn register<T : Component>(&mut self) {
+        let type_id = TypeId::of::<T>();
+        debug_assert!(
+            !self.components.contains_key(&type_id),
+            "Cannot register a component as twice");
+        self.components.insert(
+           type_id,
+            RefCell::new(
+                Box::new(
+                    SparseSet::<EntityId,T>::new()
+                ))
+        );
     }
 
-    pub fn register<T : Component>(&mut self) -> &mut Self{
-        //registered
-        if self.components.contains_key(&TypeId::of::<T>()) {
-            panic!("Cannot register component {} as twice",std::any::type_name::<T>());
+    pub fn create_entity(&mut self) -> EntityRef<'_>{
+        //safe here:
+        // the entity_flags[0] cannot be removed
+        if let Some(last_id) = self.entity_flags.first().unwrap() {
+            let last_id = *last_id;
+            //we got an id can be reused
+            let new_id = self.entity_flags[last_id.get()];
+            self.entity_flags[last_id.get()] = None;
+            self.entity_flags[0] = new_id;
+            EntityRef::new(self,last_id)
         }else{
-            self.components.insert(
-                TypeId::of::<T>(),
-                RefCell::new(Box::new(SparseSet::<EntityId, T>::new())));
-        }
-        self
-    }
-
-    pub fn make_group<A : Component,B : Component>(&mut self){
-        let tid_a = TypeId::of::<A>();
-        let tid_b = TypeId::of::<B>();
-        //panic if A or B already in group
-        for group in &self.groups {
-            let group = group.borrow();
-            if group.types.contains(&tid_a) {
-                panic!("Component {} is already in group!",std::any::type_name::<A>())
-            }
-            if group.types.contains(&tid_b) {
-                panic!("Component {} is already in group!",std::any::type_name::<B>())
-            }
-        }
-        let mut group = Group{
-            types: {
-                let mut set = HashSet::new();
-                set.insert(tid_a);
-                set.insert(tid_b);
-                set
-            },
-            range: (0..0),
-            need_update: false
-        };
-        // re-order by the shorter one
-        let len = {
-            let mut component_a = self.components_mut::<A>().unwrap();
-            let mut component_b = self.components_mut::<B>().unwrap();
-            component_a.make_group_in(&mut component_b,0)
-        };
-        group.range.end = len;
-        self.groups.push(RefCell::new(group));
-    }
-
-    pub fn remove_group<A : Component,B : Component>(&mut self){
-        let mut index = None;
-        for (i,group) in self.groups.iter().enumerate() {
-            let group = group.borrow();
-            if group.types.len() == 2
-            && group.types.contains(&TypeId::of::<A>())
-            && group.types.contains(&TypeId::of::<B>()) {
-                index = Some(i);
-                break;
-            }
-        };
-        if let Some(index) = index {
-            self.groups.remove(index);
-        }else{
-            panic!("Group<{},{}> does not exist",std::any::type_name::<A>(),std::any::type_name::<B>());
+            //full
+            let id = self.entity_flags.len();
+            self.entity_flags.push(None);
+            //safe here because this id can't be 0
+            EntityRef::new(self, unsafe { EntityId::new_unchecked(id) })
         }
     }
 
-    pub(in crate) fn group_filter_iter<T : Component>(&self) -> impl Iterator<Item = &RefCell<Group>>{
-        self.groups
-            .iter()
-            .filter(|group|{
-                let group = (*group).borrow();
-                group.types.contains(&TypeId::of::<T>())
-            })
+    pub fn remove_entity(&mut self,entity_id : EntityId){
+        let _entity_id = entity_id.get();
+        assert!(self.exist(entity_id),"Entity is not existence");
+        self.entity_flags[_entity_id] = self.entity_flags[0];
+        self.entity_flags[0] = Some(entity_id);
+        //remove all components of this entity
+        for (_,storage) in &mut self.components{
+            let mut storage = storage.borrow_mut();
+            storage.remove(entity_id);
+        }
     }
 
-    pub fn add_component<T : Component>(&mut self, entity_id : EntityId, component : T){
-        for group in self.group_filter_iter::<T>() {
-            let mut group = group.borrow_mut();
-            group.need_update = true;
-        }
-        if let Some(ptr) = self.components.get_mut(&TypeId::of::<T>()) {
-            let mut ptr = ptr.borrow_mut();
-            let manager = ptr.downcast_mut::<SparseSet<EntityId,T>>().unwrap();
-            if !manager.exist(entity_id) {
-                self.components_count[entity_id] += 1;
-            }
-            manager.add(entity_id,component);
-            return;
-        }
-        panic!("Component {} have not been registered !",std::any::type_name::<T>());
-    }
-
-    pub fn remove_component<T : Component>(&mut self, entity_id : EntityId) -> Option<T> {
-        for group in self.group_filter_iter::<T>() {
-            let mut group = group.borrow_mut();
-            group.need_update = true;
-        }
-        if let Some(ptr) = self.components.get_mut(&TypeId::of::<T>()) {
-            let mut ptr = ptr.borrow_mut();
-            let manager = ptr.downcast_mut::<SparseSet<EntityId,T>>().unwrap();
-            if manager.exist(entity_id) {
-                self.components_count[entity_id] -= 1;
-                if self.components_count[entity_id] == 0 {
-                    self.destroyed_count += 1;
-                    if let Some(prev_id) = self.destroyed_id {
-                        self.components_count[entity_id] = prev_id;
-                    }
-                    self.destroyed_id = Some(entity_id);
-                }
-            }
-            return manager.remove(entity_id);
-        }
-        panic!("Type <{}> have not been registered !",std::any::type_name::<T>());
-    }
-
-    pub(in crate) fn components<T : Component>(&self) -> Option<Ref<'_,SparseSet<EntityId,T>>> {
-        let ref_box = self.components
-            .get(&TypeId::of::<T>())?
-            .borrow();
-        Some(Ref::map(ref_box,|component|{
-            component.downcast_ref::<SparseSet<EntityId,T>>().unwrap()
-        }))
-    }
-    pub(in crate) fn components_mut<T : Component>(&self) -> Option<RefMut<'_,SparseSet<EntityId,T>>> {
-        let ref_box = self.components
-            .get(&TypeId::of::<T>())?
+    pub fn attach_component<T : Component>(&mut self,entity_id : EntityId,component : T){
+        debug_assert!(self.components.contains_key(&TypeId::of::<T>()),
+            "Component has not been registered.");
+        let mut components = self.components
+            .get(&TypeId::of::<T>())
+            .unwrap()
             .borrow_mut();
-        Some(RefMut::map(ref_box,|component|{
-            component.downcast_mut::<SparseSet<EntityId,T>>().unwrap()
-        }))
+        unsafe {
+            components.downcast_mut::<SparseSet<EntityId,T>>()
+        }.add(entity_id,component);
     }
 
-    pub(in crate) fn group<A : Component,B : Component>(&self) -> Option<Ref<'_,Group>> {
-        self.groups.iter().find(|group|{
-            let group = (*group).borrow();
-            group.types.len() == 2 &&
-            group.types.contains(&TypeId::of::<A>()) &&
-            group.types.contains(&TypeId::of::<B>())
-        }).map(|group|{
-            group.borrow()
+    pub fn detach_component<T : Component>(&mut self,entity_id : EntityId) -> Option<T>{
+        debug_assert!(self.components.contains_key(&TypeId::of::<T>()),
+                      "Component has not been registered.");
+        let mut components = self.components
+            .get(&TypeId::of::<T>())
+            .unwrap()
+            .borrow_mut();
+        unsafe {
+            components.downcast_mut::<SparseSet<EntityId,T>>()
+        }.remove(entity_id)
+    }
+
+    pub fn components_ref<T : Component>(&self) -> Ref<'_,[T]>{
+        debug_assert!(self.components.contains_key(&TypeId::of::<T>()),
+                      "Component has not been registered.");
+        let components = self.components
+            .get(&TypeId::of::<T>())
+            .unwrap()
+            .borrow();
+        Ref::map(components,|raw|{
+            unsafe{
+                raw.downcast_ref::<SparseSet<EntityId,T>>()
+            }.data()
         })
     }
 
-    pub(in crate) fn group_mut<A : Component,B : Component>(&self) -> Option<RefMut<'_,Group>> {
-        self.groups.iter().find(|group|{
-            let group = (*group).borrow();
-            group.types.len() == 2 &&
-                group.types.contains(&TypeId::of::<A>()) &&
-                group.types.contains(&TypeId::of::<B>())
-        }).map(|group|{
-            group.borrow_mut()
+    pub fn components_mut<T : Component>(&mut self) -> RefMut<'_,[T]>{
+        debug_assert!(self.components.contains_key(&TypeId::of::<T>()),
+                      "Component has not been registered.");
+        let components = self.components
+            .get_mut(&TypeId::of::<T>())
+            .unwrap()
+            .borrow_mut();
+        RefMut::map(components,|raw|{
+            unsafe{
+                raw.downcast_mut::<SparseSet<EntityId,T>>()
+            }.data_mut()
         })
     }
-    pub fn entities_count(&self) -> usize {
-        self.components_count.len() - self.destroyed_count
+
+    pub fn exist(&mut self,entity_id : EntityId) -> bool {
+        let entity_id = entity_id.get();
+        entity_id < self.entity_flags.len() && self.entity_flags[entity_id].is_none()
     }
 
-    pub fn make_query<T : Component>(&mut self) -> Query<'_,T>{
-        Query{
-            world: self,
-            _marker: Default::default()
+    pub fn entity(&mut self,entity_id : EntityId) -> Option<EntityRef<'_>> {
+        if self.exist(entity_id) {
+            Some(EntityRef::new(self, entity_id))
+        }else{
+            None
         }
     }
-
 }
 
-/*
-p: 0 1 2 3 4 5 6 7
-m:         x x
-A: 4 7 2 1 3 6
-B: 4 7 8 5 3
-g:-----^
-updated ent:3 6
-updated pos:4 5
-*/
 #[cfg(test)]
 mod tests{
     use crate::world::World;
-    use crate::{Component};
+    use crate::{Component, EntityId};
+
+    #[test]
+    fn flags_test(){
+        let mut world = World::new();
+        world.create_entity(); // 1
+        world.create_entity(); // 2
+        world.create_entity(); // 3
+        world.create_entity(); // 4
+        world.create_entity(); // 5
+        assert_eq!(world.entity_flags.as_slice(),
+                   &[None,None,None,None,None,None]);
+        world.remove_entity(EntityId::new(3).unwrap());
+        assert_eq!(world.entity_flags.as_slice(),
+                   &[EntityId::new(3),None,None,None,None,None]);
+        world.remove_entity(EntityId::new(5).unwrap());
+        assert_eq!(world.entity_flags.as_slice(),
+                   &[EntityId::new(5),None,None,None,None,EntityId::new(3)]);
+        world.remove_entity(EntityId::new(1).unwrap());
+        assert_eq!(world.entity_flags.as_slice(),
+                   &[EntityId::new(1),EntityId::new(5),None,None,None,EntityId::new(3)]);
+        assert_eq!(world.create_entity().into_id(),EntityId::new(1).unwrap());
+        assert_eq!(world.entity_flags.as_slice(),
+                   &[EntityId::new(5),None,None,None,None,EntityId::new(3)]);
+        assert_eq!(world.create_entity().into_id(),EntityId::new(5).unwrap());
+        assert_eq!(world.entity_flags.as_slice(),
+                   &[EntityId::new(3),None,None,None,None,None]);
+        assert_eq!(world.create_entity().into_id(),EntityId::new(3).unwrap());
+        assert_eq!(world.entity_flags.as_slice(),
+                   &[None,None,None,None,None,None]);
+        assert_eq!(world.create_entity().into_id(),EntityId::new(6).unwrap());
+        assert_eq!(world.entity_flags.as_slice(),
+                   &[None,None,None,None,None,None,None]);
+
+    }
+
+    #[test]
+    fn component_test(){
+        let mut world = World::new();
+        world.register::<char>();
+        let id1 = world.create_entity().into_id();
+        let id2 = world.create_entity().into_id();
+        let id3 = world.create_entity().into_id();
+
+        world.attach_component(id1,'c');
+        world.attach_component(id2,'a');
+
+        assert_eq!(world.components_ref::<char>().as_ref(),&['c','a']);
+
+        world.remove_entity(id1);
+
+        assert_eq!(world.components_ref::<char>().as_ref(),&['a']);
+    }
 
     #[test]
     fn test(){
@@ -239,33 +203,35 @@ mod tests{
         struct Shit(char);
 
         let mut world = World::new();
-        world
-            .register::<Fuck>()
-            .register::<Shit>();
+        world.register::<Fuck>();
+        world.register::<Shit>();
 
-        world.create_entity(Shit('a'));
-        world.create_entity(Fuck(2))
-            .with(Shit('b'))
-            .with(Shit('c'));
+        let id1 = world.create_entity()
+            .attach(Shit('a'))
+            .into_id();
+        world.create_entity()
+            .attach(Fuck(2))
+            .attach(Shit('b'))
+            .attach(Shit('c'));
         for c in 'a'..='z' {
-            world.create_entity(Shit(c));
+            world.create_entity()
+                .attach(Shit(c));
         }
-        world.remove_component::<Shit>(0);
-        world.remove_component::<Shit>(3);
-        world.remove_component::<Shit>(5);
+        world.detach_component::<Shit>(id1);
+        world.detach_component::<Shit>(EntityId::new(4).unwrap());
+        world.detach_component::<Shit>(EntityId::new(5).unwrap());
 
 
-        println!("destroyed:{},id:{:?},counts:{:?}",world.destroyed_count,world.destroyed_id,world.components_count);
-        world.create_entity(Fuck(3));
-        println!("destroyed:{},id:{:?},counts:{:?}",world.destroyed_count,world.destroyed_id,world.components_count);
-        world.create_entity(Fuck(2));
-        println!("destroyed:{},id:{:?},counts:{:?}",world.destroyed_count,world.destroyed_id,world.components_count);
-        world.create_entity(Fuck(5));
-        println!("destroyed:{},id:{:?},counts:{:?}",world.destroyed_count,world.destroyed_id,world.components_count);
-        world.create_entity(Fuck(7));
-        println!("destroyed:{},id:{:?},counts:{:?}",world.destroyed_count,world.destroyed_id,world.components_count);
-        println!("Shit:{:?}",world.components::<Shit>().unwrap().data());
-        println!("Fuck:{:?}",world.components::<Fuck>().unwrap().data());
+        world.create_entity()
+            .attach(Fuck(3));
+        world.create_entity()
+            .attach(Fuck(2));
+        world.create_entity()
+            .attach(Fuck(5));
+        world.create_entity()
+            .attach(Fuck(7));
+        println!("Shit:{:?}",world.components_ref::<Shit>());
+        println!("Fuck:{:?}",world.components_ref::<Fuck>());
 
         // world.create_entity().with(Fuck(2)).build();
         // let entity = world
@@ -303,37 +269,37 @@ mod tests{
 
     #[test]
     fn group_test(){
-        let mut world = World::new();
-
-        world
-            .register::<u32>()
-            .register::<char>();
-
-        world.create_entity(1u32);
-        world.create_entity(2u32);
-        world.create_entity(3u32)
-            .with('a');
-        world.create_entity(4u32)
-            .with('b');
-        world.create_entity(5u32)
-            .with('c');
-        world.create_entity(6u32);
-        world.create_entity('d');
-        println!("u32 :{:?}",world.components::<u32>().unwrap().entities());
-        println!("char:{:?}",world.components::<char>().unwrap().entities());
-
-        println!();
-
-        world.make_group::<u32,char>();
-        println!("u32 :{:?}",world.components::<u32>().unwrap().entities());
-        println!("char:{:?}",world.components::<char>().unwrap().entities());
-
-        let mut iter = world.group_filter_iter::<char>();
-        if let Some(group) = iter.next() {
-            let group = group.borrow();
-            println!("Group len:{}",group.range.len());
-        }else{
-            panic!("Cannot find any group has <{}>",std::any::type_name::<char>())
-        }
+        // let mut world = World::new();
+        //
+        // world
+        //     .register::<u32>()
+        //     .register::<char>();
+        //
+        // world.create_entity(1u32);
+        // world.create_entity(2u32);
+        // world.create_entity(3u32)
+        //     .with('a');
+        // world.create_entity(4u32)
+        //     .with('b');
+        // world.create_entity(5u32)
+        //     .with('c');
+        // world.create_entity(6u32);
+        // world.create_entity('d');
+        // println!("u32 :{:?}",world.components::<u32>().unwrap().entities());
+        // println!("char:{:?}",world.components::<char>().unwrap().entities());
+        //
+        // println!();
+        //
+        // world.make_group::<u32,char>();
+        // println!("u32 :{:?}",world.components::<u32>().unwrap().entities());
+        // println!("char:{:?}",world.components::<char>().unwrap().entities());
+        //
+        // let mut iter = world.group_filter_iter::<char>();
+        // if let Some(group) = iter.next() {
+        //     let group = group.borrow();
+        //     println!("Group len:{}",group.range.len());
+        // }else{
+        //     panic!("Cannot find any group has <{}>",std::any::type_name::<char>())
+        // }
     }
 }

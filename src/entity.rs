@@ -1,27 +1,45 @@
-use crate::World;
-use crate::Component;
+use std::num::NonZeroUsize;
+use crate::{World, Component};
 
-pub type EntityId = usize;
+pub type EntityId = NonZeroUsize;
 
-pub struct Entity<'a>{
+pub struct EntityRef<'a>{
     world : &'a mut World,
-    entity_id : EntityId
+    id : EntityId
 }
 
-impl<'a> Entity<'a> {
-    pub(in crate) fn new(world: &'a mut World, entity_id: EntityId) -> Entity<'a>{
-        Entity{
+impl<'a> EntityRef<'a>{
+    pub(in crate) fn new(world : &'a mut World,entity_id : EntityId) -> EntityRef<'a>{
+        EntityRef{
             world,
-            entity_id
+            id: entity_id
         }
     }
 
-    pub fn with<T : Component>(self,component: T) -> Entity<'a> {
-        self.world.add_component::<T>(self.entity_id, component);
+    pub fn into_id(self) -> EntityId{
+        self.id
+    }
+
+    pub fn attach<T : Component>(self,component : T) -> EntityRef<'a>{
+        self.world.attach_component(self.id,component);
         self
     }
 
-    pub fn id(&self) -> EntityId {
-        self.entity_id
+    pub fn detach<T : Component>(self) -> EntityRef<'a>{
+        self.world.detach_component::<T>(self.id);//ignore the error
+        self
+    }
+}
+
+pub trait IntoEntityRef {
+    fn into_entity_ref(self,world : &mut World) -> EntityRef<'_>;
+}
+
+impl IntoEntityRef for EntityId{
+    fn into_entity_ref(self, world: &mut World) -> EntityRef<'_> {
+        EntityRef{
+            world,
+            id: self
+        }
     }
 }
