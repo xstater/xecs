@@ -132,7 +132,7 @@ impl World {
         })
     }
 
-    pub fn entities<T : Component>(&self) -> Ref<'_,[EntityId]> {
+    pub fn entities_in<T : Component>(&self) -> Ref<'_,[EntityId]> {
         let storage = self.components_storage_ref::<T>();
         Ref::map(storage,|raw|{
             raw.entities()
