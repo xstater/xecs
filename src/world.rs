@@ -9,12 +9,10 @@ use crate::entity::EntityRef;
 pub struct World {
     // entity_flags[0] : Because the ID 0 is not a valid ID,
     //     so the first one can be used to store the last removed ID
-    // entity_flags[id] : has 2 state below:
-    // None -> This ID is not available now
-    //     It means that this ID has already been used
-    // Some(id) -> This ID is available
-    //      'id' is the next available ID
-    entity_flags : Vec<Option<EntityId>>,
+    //     Unavailable(_)      -> there is no entityID for reuse
+    //     Available(EntityID) -> the EntityID
+    entity_flags : Vec<EntityFlag>,
+    entities : Vec<EntityId>,
     // Box<SparseSet<EntityId,Component>>
     components: HashMap<TypeId,RefCell<Box<dyn ComponentStorage>>>,
     groups : Vec<Group>
@@ -23,7 +21,8 @@ pub struct World {
 impl World {
     pub fn new() -> World {
         World {
-            entity_flags : vec![None],
+            entity_flags : vec![EntityFlag::Unavailable(0)],
+            entities : vec![],
             components: Default::default(),
             groups : vec![]
         }
@@ -46,28 +45,41 @@ impl World {
     pub fn create_entity(&mut self) -> EntityRef<'_>{
         //safe here:
         // the entity_flags[0] cannot be removed
-        if let Some(last_id) = self.entity_flags.first().unwrap() {
+        if let EntityFlag::Available(last_id) = self.entity_flags.first().unwrap() {
             let last_id = *last_id;
             //we got an id can be reused
             let new_id = self.entity_flags[last_id.get()];
-            self.entity_flags[last_id.get()] = None;
+            self.entities.push(last_id);
+            self.entity_flags[last_id.get()] = EntityFlag::Unavailable(self.entities.len() - 1);
             self.entity_flags[0] = new_id;
             EntityRef::new(self,last_id)
         }else{
             //full
             let id = self.entity_flags.len();
-            self.entity_flags.push(None);
+            // safe here: because id cannot be zero
+            let id = unsafe { EntityId::new_unchecked(id) };
+            self.entities.push(id);
+            self.entity_flags.push(EntityFlag::Unavailable(self.entities.len() - 1));
             //safe here because this id can't be 0
-            EntityRef::new(self, unsafe { EntityId::new_unchecked(id) })
+            EntityRef::new(self, id)
         }
         // todo: add support for group
     }
 
     pub fn remove_entity(&mut self,entity_id : EntityId){
-        let _entity_id = entity_id.get();
-        assert!(self.exist(entity_id),"Entity is not existence");
-        self.entity_flags[_entity_id] = self.entity_flags[0];
-        self.entity_flags[0] = Some(entity_id);
+        let entity_id_ = entity_id.get();
+        if let EntityFlag::Unavailable(index) = self.entity_flags[entity_id_] {
+            // unwrap safe : in this branch,we must has one entity at least
+            let the_last_one_id = self.entities.last().unwrap();
+            // move this entity to the end of entities
+            self.entity_flags[the_last_one_id.get()] = EntityFlag::Unavailable(index);
+            self.entities.swap_remove(index);
+            // keep this destroyed id be a chain
+            self.entity_flags[entity_id_] = self.entity_flags[0];
+            self.entity_flags[0] = EntityFlag::Available(entity_id);
+        } else {
+            panic!("Entity is not existence");
+        }
         //remove all components of this entity
         for (_,storage) in &mut self.components{
             let mut storage = storage.borrow_mut();
@@ -132,6 +144,10 @@ impl World {
         })
     }
 
+    pub fn entities(&self) -> &[EntityId] {
+        self.entities.as_slice()
+    }
+
     pub fn entities_in<T : Component>(&self) -> Ref<'_,[EntityId]> {
         let storage = self.components_storage_ref::<T>();
         Ref::map(storage,|raw|{
@@ -141,7 +157,12 @@ impl World {
 
     pub fn exist(&mut self,entity_id : EntityId) -> bool {
         let entity_id = entity_id.get();
-        entity_id < self.entity_flags.len() && self.entity_flags[entity_id].is_none()
+        if entity_id < self.entity_flags.len() {
+            if let EntityFlag::Unavailable(_) = self.entity_flags[entity_id]{
+                return true
+            }
+        }
+        return false;
     }
 
     pub fn entity(&mut self,entity_id : EntityId) -> Option<EntityRef<'_>> {
@@ -283,6 +304,14 @@ impl World {
     }
 }
 
+#[derive(Debug,Copy,Clone)]
+pub enum EntityFlag{
+    /// store the next available EntityID
+    Available(EntityId),
+    /// store the index of EntityID in entities array
+    Unavailable(usize)
+}
+
 #[derive(Debug)]
 pub struct FullOwningGroup{
     types : (TypeId,TypeId),
@@ -343,7 +372,7 @@ impl Group {
 
 #[cfg(test)]
 mod tests{
-    use crate::world::{World, FullOwningGroup, PartialOwningGroup, NonOwningGroup, Group};
+    use crate::world::{World, FullOwningGroup, PartialOwningGroup, NonOwningGroup, Group, EntityFlag};
     use crate::{ EntityId};
 
     #[test]
@@ -354,30 +383,45 @@ mod tests{
         world.create_entity(); // 3
         world.create_entity(); // 4
         world.create_entity(); // 5
-        assert_eq!(world.entity_flags.as_slice(),
-                   &[None,None,None,None,None,None]);
+        println!("#initial");
+        println!("flags    :{:?}",world.entity_flags.as_slice());
+        println!("entities :{:?}",world.entities.as_slice());
+        println!();
         world.remove_entity(EntityId::new(3).unwrap());
-        assert_eq!(world.entity_flags.as_slice(),
-                   &[EntityId::new(3),None,None,None,None,None]);
+        println!("#removed id=3");
+        println!("flags :{:?}",world.entity_flags.as_slice());
+        println!("entities :{:?}",world.entities.as_slice());
+        println!();
         world.remove_entity(EntityId::new(5).unwrap());
-        assert_eq!(world.entity_flags.as_slice(),
-                   &[EntityId::new(5),None,None,None,None,EntityId::new(3)]);
+        println!("#removed id=5");
+        println!("flags :{:?}",world.entity_flags.as_slice());
+        println!("entities :{:?}",world.entities.as_slice());
+        println!();
         world.remove_entity(EntityId::new(1).unwrap());
-        assert_eq!(world.entity_flags.as_slice(),
-                   &[EntityId::new(1),EntityId::new(5),None,None,None,EntityId::new(3)]);
+        println!("#removed id=1");
+        println!("flags :{:?}",world.entity_flags.as_slice());
+        println!("entities :{:?}",world.entities.as_slice());
+        println!();
         assert_eq!(world.create_entity().into_id(),EntityId::new(1).unwrap());
-        assert_eq!(world.entity_flags.as_slice(),
-                   &[EntityId::new(5),None,None,None,None,EntityId::new(3)]);
+        println!("#create a new entity, id = 1");
+        println!("flags :{:?}",world.entity_flags.as_slice());
+        println!("entities :{:?}",world.entities.as_slice());
+        println!();
         assert_eq!(world.create_entity().into_id(),EntityId::new(5).unwrap());
-        assert_eq!(world.entity_flags.as_slice(),
-                   &[EntityId::new(3),None,None,None,None,None]);
+        println!("#create a new entity, id = 5");
+        println!("flags :{:?}",world.entity_flags.as_slice());
+        println!("entities :{:?}",world.entities.as_slice());
+        println!();
         assert_eq!(world.create_entity().into_id(),EntityId::new(3).unwrap());
-        assert_eq!(world.entity_flags.as_slice(),
-                   &[None,None,None,None,None,None]);
+        println!("#create a new entity, id = 3");
+        println!("flags :{:?}",world.entity_flags.as_slice());
+        println!("entities :{:?}",world.entities.as_slice());
+        println!();
         assert_eq!(world.create_entity().into_id(),EntityId::new(6).unwrap());
-        assert_eq!(world.entity_flags.as_slice(),
-                   &[None,None,None,None,None,None,None]);
-
+        println!("#create a new entity, id = 6");
+        println!("flags :{:?}",world.entity_flags.as_slice());
+        println!("entities :{:?}",world.entities.as_slice());
+        println!();
     }
 
     #[test]
@@ -485,18 +529,18 @@ mod tests{
         world.create_entity().attach(5u32).attach('c');
         world.create_entity().attach(6u32);
         world.create_entity().attach('d').attach(());
-        println!("u32 :{:?}",world.entities::<u32>());
-        println!("char:{:?}",world.entities::<char>());
-        println!("()  :{:?}",world.entities::<()>());
+        println!("u32 :{:?}",world.entities_in::<u32>());
+        println!("char:{:?}",world.entities_in::<char>());
+        println!("()  :{:?}",world.entities_in::<()>());
 
         println!();
 
         world.make_group::<u32,char>(true,true);
         world.make_group::<u32,char>(false,false);
         world.make_group::<u32,()>(false,true);
-        println!("u32 :{:?}",world.entities::<u32>());
-        println!("char:{:?}",world.entities::<char>());
-        println!("()  :{:?}",world.entities::<()>());
+        println!("u32 :{:?}",world.entities_in::<u32>());
+        println!("char:{:?}",world.entities_in::<char>());
+        println!("()  :{:?}",world.entities_in::<()>());
 
         for group in &world.groups {
             println!("{:?}",group);
@@ -505,6 +549,9 @@ mod tests{
 
     #[test]
     fn size_test(){
+        println!("Size of bool:{}Bytes",std::mem::size_of::<bool>());
+        println!("Size of u64:{}Bytes",std::mem::size_of::<u64>());
+        println!("Size of EntityFlag:{}Bytes",std::mem::size_of::<EntityFlag>());
         println!("Size of Full-Owning Group:{}Bytes",std::mem::size_of::<FullOwningGroup>());
         println!("Size of Partial-Owning Group:{}Bytes",std::mem::size_of::<PartialOwningGroup>());
         println!("Size of Non-Owning Group:{}Bytes",std::mem::size_of::<NonOwningGroup>());
