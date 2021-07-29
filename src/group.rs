@@ -206,7 +206,6 @@ impl Group {
         if self.in_group(world,entity_id) {
             return;
         }
-        println!("Group:add id={}",entity_id);
         match self {
             Group::Owning(group) => {
                 if let OwningType::Owning(type_id) = group.types.0 {
