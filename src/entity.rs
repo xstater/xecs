@@ -3,9 +3,16 @@ use crate::{World, Component};
 
 pub type EntityId = NonZeroUsize;
 
+#[derive(Debug)]
 pub struct EntityRef<'a>{
     world : &'a mut World,
     id : EntityId
+}
+
+impl PartialEq for EntityRef{
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
 }
 
 impl<'a> EntityRef<'a>{
