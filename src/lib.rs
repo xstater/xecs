@@ -1,6 +1,7 @@
 mod world;
 mod entity;
 mod components;
+mod group;
 
 pub use entity::EntityId;
 pub use world::World;

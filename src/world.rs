@@ -5,6 +5,7 @@ use std::cell::{RefCell, Ref, RefMut};
 use crate::components::ComponentStorage;
 use xsparseset::SparseSet;
 use crate::entity::EntityRef;
+use crate::group::{Group, NonOwningGroup, OwningType, OwningGroup};
 
 pub struct World {
     // entity_flags[0] : Because the ID 0 is not a valid ID,
@@ -15,7 +16,7 @@ pub struct World {
     entities : Vec<EntityId>,
     // Box<SparseSet<EntityId,Component>>
     components: HashMap<TypeId,RefCell<Box<dyn ComponentStorage>>>,
-    groups : Vec<Group>
+    groups : Vec<RefCell<Group>>
 }
 
 impl World {
@@ -63,7 +64,6 @@ impl World {
             //safe here because this id can't be 0
             EntityRef::new(self, id)
         }
-        // todo: add support for group
     }
 
     pub fn remove_entity(&mut self,entity_id : EntityId){
@@ -85,10 +85,26 @@ impl World {
             let mut storage = storage.borrow_mut();
             storage.remove(entity_id);
         }
-        // todo: add support for group
     }
 
-    fn components_storage_ref<T : Component>(&self) -> Ref<'_,SparseSet<EntityId,T>>{
+    pub(in crate) fn components_storage_dyn_ref(&self,type_id : TypeId) -> Ref<'_,Box<dyn ComponentStorage>> {
+        debug_assert!(self.components.contains_key(&type_id),
+                      "Component has not been registered.");
+        self.components
+            .get(&type_id)
+            .unwrap()
+            .borrow()
+    }
+    pub(in crate) fn components_storage_dyn_mut(&self,type_id : TypeId) -> RefMut<'_,Box<dyn ComponentStorage>> {
+        debug_assert!(self.components.contains_key(&type_id),
+                      "Component has not been registered.");
+        self.components
+            .get(&type_id)
+            .unwrap()
+            .borrow_mut()
+    }
+
+    pub(in crate) fn components_storage_ref<T : Component>(&self) -> Ref<'_,SparseSet<EntityId,T>>{
         debug_assert!(self.components.contains_key(&TypeId::of::<T>()),
                       "Component has not been registered.");
         let components = self.components
@@ -103,7 +119,7 @@ impl World {
         })
     }
 
-    fn components_storage_mut<T : Component>(&self) -> RefMut<'_,SparseSet<EntityId,T>>{
+    pub(in crate) fn components_storage_mut<T : Component>(&self) -> RefMut<'_,SparseSet<EntityId,T>>{
         debug_assert!(self.components.contains_key(&TypeId::of::<T>()),
                       "Component has not been registered.");
         let components = self.components
@@ -121,13 +137,23 @@ impl World {
     pub fn attach_component<T : Component>(&mut self,entity_id : EntityId,component : T){
         self.components_storage_mut::<T>()
             .add(entity_id,component);
-        // todo: add support for group
+        for group in &self.groups{
+            let mut group = group.borrow_mut();
+            if group.contains(TypeId::of::<T>()) {
+                group.add(self,entity_id);
+            }
+        }
     }
 
     pub fn detach_component<T : Component>(&mut self,entity_id : EntityId) -> Option<T>{
+        for group in &self.groups {
+            let mut group = group.borrow_mut();
+            if group.contains(TypeId::of::<T>()) {
+                group.remove(self,entity_id);
+            }
+        }
         self.components_storage_mut::<T>()
             .remove(entity_id)
-        // todo: add support for group
     }
 
     pub fn components_ref<T : Component>(&self) -> Ref<'_,[T]>{
@@ -178,8 +204,9 @@ impl World {
             {
                 let mut ok = true;
                 for group in &self.groups {
-                    if (owning_a && group.is_owned::<A>())
-                    || (owning_b && group.is_owned::<B>()) {
+                    let group = group.borrow();
+                    if (owning_a && group.is_owned(TypeId::of::<A>()))
+                    || (owning_b && group.is_owned(TypeId::of::<B>())) {
                         ok = false;
                         break;
                     }
@@ -187,120 +214,29 @@ impl World {
                 ok
             }
         ,"Component in group cannot be owned twice");
-        if owning_a && owning_b {
-            // full-owning group
-            let mut group = FullOwningGroup {
-                types: (TypeId::of::<A>(), TypeId::of::<B>()),
-                length: 0
-            };
-            {
-                let mut comp_a = self.components_storage_mut::<A>();
-                let mut comp_b = self.components_storage_mut::<B>();
-                let len_a = comp_a.len();
-                let len_b = comp_b.len();
-                if len_a < len_b {
-                    for index_a in 0..len_a {
-                        let entity_id = comp_a.entities()[index_a];
-                        if let Some(index_b) = comp_b.get_index(entity_id) {
-                            comp_a.swap_by_index(group.length, index_a);
-                            comp_b.swap_by_index(group.length, index_b);
-                            group.length += 1;
-                        }
-                    }
-                } else {
-                    for index_b in 0..len_b {
-                        let entity_id = comp_b.entities()[index_b];
-                        if let Some(index_a) = comp_a.get_index(entity_id) {
-                            comp_a.swap_by_index(group.length,index_a);
-                            comp_b.swap_by_index(group.length,index_b);
-                            group.length += 1;
-                        }
-                    }
-                }
-            }
-            self.groups.push(Group::Full(group));
-            return;
-        }
-
-        if owning_a {
-            //partial-owning group
-            let mut group = PartialOwningGroup{
-                owned_type: TypeId::of::<A>(),
-                non_owned_type: TypeId::of::<B>(),
-                length: 0
-            };
-            {
-                //we owned A,so we just need to sort A
-                let mut comp_a = self.components_storage_mut::<A>();
-                let     comp_b = self.components_storage_ref::<B>();
-                for index in 0..comp_a.len() {
-                    let entity_id = comp_a.entities()[index];
-                    if comp_b.exist(entity_id) {
-                        comp_a.swap_by_index(group.length,index);
-                        group.length += 1;
-                    }
-                }
-            }
-            self.groups.push(Group::Partial(group));
-            return;
-        }
-
-        if owning_b {
-            //partial-owning group
-            let mut group = PartialOwningGroup{
-                owned_type: TypeId::of::<B>(),
-                non_owned_type: TypeId::of::<A>(),
-                length: 0
-            };
-            {
-                //we owned B,so we just need to sort B
-                let     comp_a = self.components_storage_ref::<A>();
-                let mut comp_b = self.components_storage_mut::<B>();
-                for index in 0..comp_b.len() {
-                    let entity_id = comp_b.entities()[index];
-                    if comp_a.exist(entity_id) {
-                        comp_b.swap_by_index(group.length,index);
-                        group.length += 1;
-                    }
-                }
-            }
-            self.groups.push(Group::Partial(group));
-            return;
-        }
-
-        //Non-Owning
-        let mut group = NonOwningGroup{
-            types: (TypeId::of::<A>(),TypeId::of::<B>()),
-            entities: vec![],
-            index_a: vec![],
-            index_b: vec![]
-        };
-        {
-            let comp_a = self.components_storage_ref::<A>();
-            let comp_b = self.components_storage_ref::<B>();
-            let len_a = comp_a.len();
-            let len_b = comp_b.len();
-            if len_a < len_b {
-                for index_a in 0..len_a {
-                    let entity_id = comp_a.entities()[index_a];
-                    if let Some(index_b) = comp_b.get_index(entity_id){
-                        group.entities.push(entity_id);
-                        group.index_a.push(index_a);
-                        group.index_b.push(index_b);
-                    }
-                }
+        let mut group = if owning_a || owning_b {
+            let a = if owning_a {
+                OwningType::Owning(TypeId::of::<A>())
             } else {
-                for index_b in 0..len_b {
-                    let entity_id = comp_b.entities()[index_b];
-                    if let Some(index_a) = comp_a.get_index(entity_id) {
-                        group.entities.push(entity_id);
-                        group.index_a.push(index_a);
-                        group.index_b.push(index_b)
-                    }
-                }
-            }
-        }
-        self.groups.push(Group::Non(group));
+                OwningType::NonOwning(TypeId::of::<A>())
+            };
+            let b = if owning_b {
+                OwningType::Owning(TypeId::of::<B>())
+            } else {
+                OwningType::NonOwning(TypeId::of::<B>())
+            };
+            Group::Owning(OwningGroup{
+                types: (a,b),
+                length: 0
+            })
+        } else {
+            Group::NonOwning(NonOwningGroup{
+                types: (TypeId::of::<A>(), TypeId::of::<B>()),
+                sparse_set: SparseSet::new()
+            })
+        };
+        group.make_group_in_world::<A,B>(&self);
+        self.groups.push(RefCell::new(group));
     }
 }
 
@@ -311,69 +247,11 @@ pub enum EntityFlag{
     /// store the index of EntityID in entities array
     Unavailable(usize)
 }
-
-#[derive(Debug)]
-pub struct FullOwningGroup{
-    types : (TypeId,TypeId),
-    length : usize
-}
-
-impl FullOwningGroup{
-    fn is_owned<T : Component>(&self) -> bool {
-        let typeid = TypeId::of::<T>();
-        typeid == self.types.0 || typeid == self.types.1
-    }
-}
-
-#[derive(Debug)]
-pub struct PartialOwningGroup {
-    owned_type : TypeId,
-    non_owned_type : TypeId,
-    length : usize
-}
-
-impl PartialOwningGroup {
-    fn is_owned<T : Component>(&self) -> bool {
-        let typeid = TypeId::of::<T>();
-        typeid == self.owned_type
-    }
-}
-
-#[derive(Debug)]
-pub struct NonOwningGroup {
-    types : (TypeId,TypeId),
-    entities : Vec<EntityId>,
-    index_a : Vec<usize>,
-    index_b : Vec<usize>
-}
-
-impl NonOwningGroup {
-    fn is_owned<T : Component>(&self) -> bool {
-        false
-    }
-}
-
-#[derive(Debug)]
-pub enum Group {
-    Full(FullOwningGroup),
-    Partial(PartialOwningGroup),
-    Non(NonOwningGroup)
-}
-
-impl Group {
-    fn is_owned<T : Component>(&self) -> bool {
-        match &self {
-            Group::Full(group) => group.is_owned::<T>(),
-            Group::Partial(group) => group.is_owned::<T>(),
-            Group::Non(group) => group.is_owned::<T>()
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests{
-    use crate::world::{World, FullOwningGroup, PartialOwningGroup, NonOwningGroup, Group, EntityFlag};
-    use crate::{ EntityId};
+    use crate::{EntityId, World};
+    use crate::group::Group;
+    use crate::world::EntityFlag;
 
     #[test]
     fn flags_test(){
@@ -430,7 +308,7 @@ mod tests{
         world.register::<char>();
         let id1 = world.create_entity().into_id();
         let id2 = world.create_entity().into_id();
-        let id3 = world.create_entity().into_id();
+        let _id3 = world.create_entity().into_id();
 
         world.attach_component(id1,'c');
         world.attach_component(id2,'a');
@@ -523,28 +401,61 @@ mod tests{
         world.register::<()>();
 
         world.create_entity().attach(1u32).attach(());
-        world.create_entity().attach(2u32);
-        world.create_entity().attach(3u32).attach('a').attach(());
+        let id2 = world.create_entity().attach(2u32).into_id();
+        let id3 = world.create_entity()
+            .attach(3u32)
+            .attach('a')
+            .attach(())
+            .into_id();
         world.create_entity().attach(4u32).attach('b');
         world.create_entity().attach(5u32).attach('c');
         world.create_entity().attach(6u32);
-        world.create_entity().attach('d').attach(());
+        let id7 = world.create_entity().attach('d').attach(()).into_id();
+        println!("#initial");
         println!("u32 :{:?}",world.entities_in::<u32>());
         println!("char:{:?}",world.entities_in::<char>());
         println!("()  :{:?}",world.entities_in::<()>());
-
         println!();
 
         world.make_group::<u32,char>(true,true);
         world.make_group::<u32,char>(false,false);
         world.make_group::<u32,()>(false,true);
+        println!("#Made group <u32,char> <u32,()>");
         println!("u32 :{:?}",world.entities_in::<u32>());
         println!("char:{:?}",world.entities_in::<char>());
         println!("()  :{:?}",world.entities_in::<()>());
+        println!();
+
+        world.entity(id2)
+            .and_then(|entity|Some(entity.attach('b')));
+        println!("#attach component b for id=2");
+        println!("u32 :{:?}",world.entities_in::<u32>());
+        println!("char:{:?}",world.entities_in::<char>());
+        println!("()  :{:?}",world.entities_in::<()>());
+        println!();
+
+        world.entity(id7)
+            .unwrap()
+            .attach(2u32);
+        println!("#attach component 2 for id=7");
+        println!("u32 :{:?}",world.entities_in::<u32>());
+        println!("char:{:?}",world.entities_in::<char>());
+        println!("()  :{:?}",world.entities_in::<()>());
+        println!();
+
+        world.entity(id3)
+            .unwrap()
+            .detach::<u32>();
+        println!("#detach component u32 for id=3");
+        println!("u32 :{:?}",world.entities_in::<u32>());
+        println!("char:{:?}",world.entities_in::<char>());
+        println!("()  :{:?}",world.entities_in::<()>());
+        println!();
 
         for group in &world.groups {
             println!("{:?}",group);
         }
+
     }
 
     #[test]
@@ -552,9 +463,6 @@ mod tests{
         println!("Size of bool:{}Bytes",std::mem::size_of::<bool>());
         println!("Size of u64:{}Bytes",std::mem::size_of::<u64>());
         println!("Size of EntityFlag:{}Bytes",std::mem::size_of::<EntityFlag>());
-        println!("Size of Full-Owning Group:{}Bytes",std::mem::size_of::<FullOwningGroup>());
-        println!("Size of Partial-Owning Group:{}Bytes",std::mem::size_of::<PartialOwningGroup>());
-        println!("Size of Non-Owning Group:{}Bytes",std::mem::size_of::<NonOwningGroup>());
         println!("Size of Group:{}Bytes",std::mem::size_of::<Group>());
     }
 }
