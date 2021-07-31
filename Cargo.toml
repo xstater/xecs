@@ -8,3 +8,7 @@ edition = "2018"
 
 [dependencies]
 xsparseset = { git = "https://github.com/xstater/xsparseset" }
+
+[dependencies.tokio]
+version = "1.9.0"
+features = ["full"]
