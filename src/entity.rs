@@ -9,12 +9,6 @@ pub struct EntityRef<'a>{
     id : EntityId
 }
 
-impl PartialEq for EntityRef{
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
 impl<'a> EntityRef<'a>{
     pub(in crate) fn new(world : &'a mut World,entity_id : EntityId) -> EntityRef<'a>{
         EntityRef{
