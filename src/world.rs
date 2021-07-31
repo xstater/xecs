@@ -6,6 +6,7 @@ use crate::components::ComponentStorage;
 use xsparseset::SparseSet;
 use crate::entity::EntityRef;
 use crate::group::{Group, NonOwningGroup, OwningType, OwningGroup};
+use std::fmt::{Debug, Formatter};
 
 pub struct World {
     // entity_flags[0] : Because the ID 0 is not a valid ID,
@@ -240,6 +241,20 @@ impl World {
     }
 }
 
+impl Debug for World {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("World")
+            .field("entities",&self.entities)
+            .field("groups",&self.groups)
+            .field("components",
+                   &self.components
+                       .keys()
+                       .cloned()
+                       .collect::<Vec<TypeId>>())
+            .finish()
+    }
+}
+
 #[derive(Debug,Copy,Clone)]
 pub enum EntityFlag{
     /// store the next available EntityID
@@ -464,5 +479,23 @@ mod tests{
         println!("Size of u64:{}Bytes",std::mem::size_of::<u64>());
         println!("Size of EntityFlag:{}Bytes",std::mem::size_of::<EntityFlag>());
         println!("Size of Group:{}Bytes",std::mem::size_of::<Group>());
+    }
+
+    #[test]
+    fn debug_trait_test(){
+        let mut world = World::new();
+
+        world.register::<char>();
+        world.register::<u32>();
+
+        world.make_group::<char,u32>(true,true);
+
+        world.create_entity()
+            .attach('c')
+            .attach(12_u32);
+        world.create_entity()
+            .attach('a');
+
+        println!("{:?}",world);
     }
 }
