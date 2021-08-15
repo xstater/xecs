@@ -5,11 +5,3 @@ version = 3
 [[package]]
 name = "xecs"
 version = "0.1.0"
-dependencies = [
- "xsparseset",
-]
-
-[[package]]
-name = "xsparseset"
-version = "0.1.3"
-source = "git+https://github.com/xstater/xsparseset#02ee15fa7011bb5597a02b6cb13d881129a04979"

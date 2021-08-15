@@ -2,6 +2,7 @@ use std::num::NonZeroUsize;
 use crate::{World, Component};
 
 pub type EntityId = NonZeroUsize;
+pub type Entities = [EntityId];
 
 #[derive(Debug)]
 pub struct EntityRef<'a>{
@@ -30,10 +31,6 @@ impl<'a> EntityRef<'a>{
         self.world.detach_component::<T>(self.id);//ignore the error
         self
     }
-}
-
-pub trait IntoEntityRef {
-    fn into_entity_ref(self,world : &mut World) -> EntityRef<'_>;
 }
 
 #[derive(Debug,Copy,Clone)]
@@ -132,6 +129,7 @@ mod tests{
         manager.create(); // 3
         manager.create(); // 4
         manager.create(); // 5
+        assert_eq!(dbg!(manager.len()),5);
         println!("#initial");
         println!("flags    :{:?}",manager.entity_flags.as_slice());
         println!("entities :{:?}",manager.entities.as_slice());

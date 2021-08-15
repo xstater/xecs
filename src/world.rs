@@ -1,12 +1,13 @@
-use crate::{EntityId, Component};
+use crate::{EntityId, Component, Entities};
 use std::collections::HashMap;
 use std::any::TypeId;
 use std::cell::{RefCell, Ref, RefMut};
 use crate::components::ComponentStorage;
-use xsparseset::SparseSet;
+use crate::sparse_set::SparseSet;
 use crate::entity::{EntityRef, EntityManager};
 use crate::group::{Group, NonOwningGroup, OwningType, OwningGroup};
 use std::fmt::{Debug, Formatter};
+use crate::query::{Queryable};
 
 pub struct World {
     entity_manager : EntityManager,
@@ -122,24 +123,24 @@ impl World {
     }
 
     pub fn components_ref<T : Component>(&self) -> Ref<'_,[T]>{
-        let slice_ref = self.components_storage_ref();
+        let slice_ref = self.components_storage_ref::<T>();
         Ref::map(slice_ref,|raw|{
             raw.data()
         })
     }
 
     pub fn components_mut<T : Component>(&self) -> RefMut<'_,[T]>{
-        let slice_mut = self.components_storage_mut();
+        let slice_mut = self.components_storage_mut::<T>();
         RefMut::map(slice_mut,|raw|{
             raw.data_mut()
         })
     }
 
-    pub fn entities(&self) -> &[EntityId] {
+    pub fn entities(&self) -> &Entities {
         self.entity_manager.entities()
     }
 
-    pub fn entities_in<T : Component>(&self) -> Ref<'_,[EntityId]> {
+    pub fn entities_in<T : Component>(&self) -> Ref<'_,Entities> {
         let storage = self.components_storage_ref::<T>();
         Ref::map(storage,|raw|{
             raw.entities()
@@ -197,6 +198,19 @@ impl World {
         group.make_group_in_world::<A,B>(&self);
         self.groups.push(RefCell::new(group));
     }
+
+    pub(in crate) fn group<A : Component,B : Component>(&self) -> Option<Ref<'_,Group>>{
+        self.groups.iter()
+            .map(|group|group.borrow())
+            .find(|group|{
+                group.contains(TypeId::of::<A>()) && group.contains(TypeId::of::<B>())
+            })
+    }
+
+    pub fn query<'a,T : Queryable<'a>>(&'a self) -> Box<dyn Iterator<Item=<T as Queryable>::Item> + 'a> {
+        <T as Queryable<'a>>::query(self)
+    }
+
 }
 
 impl Debug for World {
@@ -217,6 +231,7 @@ impl Debug for World {
 mod tests{
     use crate::{EntityId, World};
     use crate::group::Group;
+    use std::any::TypeId;
 
     #[test]
     fn component_test(){
@@ -372,6 +387,31 @@ mod tests{
             println!("{:?}",group);
         }
 
+    }
+
+    #[test]
+    fn query_test() {
+        let mut world = World::new();
+
+        world.register::<char>();
+        world.register::<u32>();
+
+        dbg!(world.components.contains_key(&TypeId::of::<u32>()));
+        dbg!(world.components.contains_key(&TypeId::of::<char>()));
+
+        world.create_entity()
+            .attach('a')
+            .attach(1u32);
+        world.create_entity()
+            .attach('b')
+            .attach(2u32);
+        world.create_entity()
+            .attach('c')
+            .attach(3u32);
+
+        // for (ch,num) in world.query::<(char,u32)>() {
+        //     dbg!((ch,num))
+        // }
     }
 
     #[test]

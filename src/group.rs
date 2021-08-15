@@ -1,5 +1,5 @@
 use std::any::{TypeId};
-use xsparseset::SparseSet;
+use crate::sparse_set::SparseSet;
 use crate::{EntityId, World, Component};
 use crate::components::ComponentStorage;
 
@@ -16,8 +16,13 @@ pub(in crate) struct OwningGroup {
 }
 
 impl OwningGroup {
-    fn full(&self) -> bool {
+    pub(in crate) fn full(&self) -> bool {
         self.types.0.is_owning() && self.types.1.is_owning()
+    }
+
+    pub(in crate) fn is_owned(&self,type_id : TypeId) -> bool {
+        (self.types.0.type_id() == type_id && self.types.0.is_owning())
+     || (self.types.1.type_id() == type_id && self.types.1.is_owning())
     }
 }
 
@@ -74,7 +79,6 @@ impl Group {
             Group::NonOwning(_) => return false
         }
         false
-
     }
 
     pub(in crate) fn in_two_components(&self,world : &World,entity_id : EntityId) -> bool {

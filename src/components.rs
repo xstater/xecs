@@ -1,4 +1,4 @@
-use xsparseset::SparseSet;
+use crate::sparse_set::SparseSet;
 use crate::EntityId;
 
 pub trait Component : Send + Sync + 'static {}
