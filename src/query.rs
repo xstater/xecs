@@ -141,7 +141,7 @@ macro_rules! build_iter2 {
     (@get_components Mut $world:ident $type:tt) => { $world.components_storage_mut::<$type>() };
     (@get_pointer Ref $comp:ident $type:tt) => { &    *$comp as *const SparseSet<EntityId,$type> };
     (@get_pointer Mut $comp:ident $type:tt) => { &mut *$comp as *mut   SparseSet<EntityId,$type> };
-    (@build_non_owning_iter $iter_name:ident $with_id:ident $ref_type_a:ident $ref_type_b:ident) => {
+    (@build_non_owning_iter A $iter_name:ident $with_id:ident $ref_type_a:ident $ref_type_b:ident) => {
         struct $iter_name<'a,A,B> {
             #[allow(dead_code)]
             borrow_a : build_iter2!(@to_refcell $ref_type_a A),
@@ -167,7 +167,54 @@ macro_rules! build_iter2 {
                     let (index,rem) = Ref::map_split(
                         indices,
                         |slice|slice.split_first().unwrap());
-                    let (index_a,index_b) = *index;
+                    let (index_a,index_b) = *index;//diff here
+                    self.indices = Some(rem);
+                    let data_a = build_iter2!(@get_data $ref_type_a self.ptr_a,index_a);
+                    let data_b = build_iter2!(@get_data $ref_type_b self.ptr_b,index_b);
+                    Some(build_iter2!(@output_data $with_id _id,data_a,data_b))
+                } else {
+                    None
+                }
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                if let Some(entities) = &self.entities {
+                    let len = entities.len();
+                    (len,Some(len))
+                } else {
+                    (0,Some(0))
+                }
+            }
+        }
+        impl<'a,A,B> ExactSizeIterator for $iter_name<'a,A,B> {}
+    };
+    (@build_non_owning_iter B $iter_name:ident $with_id:ident $ref_type_a:ident $ref_type_b:ident) => {
+        struct $iter_name<'a,A,B> {
+            #[allow(dead_code)]
+            borrow_a : build_iter2!(@to_refcell $ref_type_a A),
+            #[allow(dead_code)]
+            borrow_b : build_iter2!(@to_refcell $ref_type_b B),
+            entities : Option<Ref<'a,[EntityId]>>,
+            indices : Option<Ref<'a,[(usize,usize)]>>,
+            ptr_a : build_iter2!(@pointer_type $ref_type_a A),
+            ptr_b : build_iter2!(@pointer_type $ref_type_b B)
+        }
+        impl<'a,A,B> Iterator for $iter_name<'a,A,B> {
+            type Item = build_iter2!(@output_type $with_id $ref_type_a $ref_type_b);
+
+            fn next(&mut self) -> Option<Self::Item> {
+                let entities = self.entities.take()?;
+                let indices = self.indices.take()?;
+                if !entities.is_empty() {
+                    let (id,rem) = Ref::map_split(
+                        entities,
+                        |slice|slice.split_first().unwrap());
+                    let _id = *id;
+                    self.entities = Some(rem);
+                    let (index,rem) = Ref::map_split(
+                        indices,
+                        |slice|slice.split_first().unwrap());
+                    let (index_b,index_a) = *index;//diff here
                     self.indices = Some(rem);
                     let data_a = build_iter2!(@get_data $ref_type_a self.ptr_a,index_a);
                     let data_b = build_iter2!(@get_data $ref_type_b self.ptr_b,index_b);
@@ -325,7 +372,8 @@ macro_rules! build_iter2 {
         $iter_name_full_group:ident
         $iter_name_partial_a_group:ident
         $iter_name_partial_b_group:ident
-        $iter_name_non_owning_group:ident
+        $iter_name_non_owning_a_group:ident
+        $iter_name_non_owning_b_group:ident
         $with_id:ident
         $ref_type_a:ident
         $ref_type_b:ident) => {
@@ -375,7 +423,7 @@ macro_rules! build_iter2 {
                                 }
                             }
                         }
-                        Group::NonOwning(_) => {
+                        Group::NonOwning(group) => {
                             let (entities,indices) = Ref::map_split(
                                 group_ref,
                                 |group|{
@@ -387,14 +435,25 @@ macro_rules! build_iter2 {
                                     }
                                 }
                             );
-                            Box::new($iter_name_non_owning_group {
-                                borrow_a : comp_a,
-                                borrow_b : comp_b,
-                                entities : Some(entities),
-                                indices : Some(indices),
-                                ptr_a,
-                                ptr_b
-                            })
+                            if group.types.0 == TypeId::of::<A>() {
+                                Box::new($iter_name_non_owning_a_group {
+                                    borrow_a : comp_a,
+                                    borrow_b : comp_b,
+                                    entities : Some(entities),
+                                    indices : Some(indices),
+                                    ptr_a,
+                                    ptr_b
+                                })
+                            } else {
+                                Box::new($iter_name_non_owning_b_group {
+                                    borrow_a : comp_a,
+                                    borrow_b : comp_b,
+                                    entities : Some(entities),
+                                    indices : Some(indices),
+                                    ptr_b,
+                                    ptr_a
+                                })
+                            }
                         }
                     }
                 } else {
@@ -412,18 +471,19 @@ macro_rules! build_iter2 {
         build_iter2!(@build_full_group_iter $iter_name_full_group $with_id $ref_type_a $ref_type_b);
         build_iter2!(@build_partial_iter A $iter_name_partial_a_group $with_id $ref_type_a $ref_type_b);
         build_iter2!(@build_partial_iter B $iter_name_partial_b_group $with_id $ref_type_a $ref_type_b);
-        build_iter2!(@build_non_owning_iter $iter_name_non_owning_group $with_id $ref_type_a $ref_type_b);
+        build_iter2!(@build_non_owning_iter A $iter_name_non_owning_a_group $with_id $ref_type_a $ref_type_b);
+        build_iter2!(@build_non_owning_iter B $iter_name_non_owning_b_group $with_id $ref_type_a $ref_type_b);
     };
 }
 
-build_iter2!(IterRefRef IterFullRefRef IterPartialARefRef IterPartialBRefRef IterNonOwningRefRef NoId Ref Ref);
-build_iter2!(IterRefMut IterFullRefMut IterPartialARefMut IterPartialBRefMut IterNonOwningRefMut NoId Ref Mut);
-build_iter2!(IterMutRef IterFullMutRef IterPartialAMutRef IterPartialBMutRef IterNonOwningMutRef NoId Mut Ref);
-build_iter2!(IterMutMut IterFullMutMut IterPartialAMutMut IterPartialBMutMut IterNonOwningMutMut NoId Mut Mut);
-build_iter2!(IterIdRefRef IterFullIdRefRef IterPartialAIdRefRef IterPartialBIdRefRef IterNonOwningIdRefRef Id Ref Ref);
-build_iter2!(IterIdRefMut IterFullIdRefMut IterPartialAIdRefMut IterPartialBIdRefMut IterNonOwningIdRefMut Id Ref Mut);
-build_iter2!(IterIdMutRef IterFullIdMutRef IterPartialAIdMutRef IterPartialBIdMutRef IterNonOwningIdMutRef Id Mut Ref);
-build_iter2!(IterIdMutMut IterFullIdMutMut IterPartialAIdMutMut IterPartialBIdMutMut IterNonOwningIdMutMut Id Mut Mut);
+build_iter2!(IterRefRef IterFullRefRef IterPartialARefRef IterPartialBRefRef IterNonOwningARefRef IterNonOwningBRefRef NoId Ref Ref);
+build_iter2!(IterRefMut IterFullRefMut IterPartialARefMut IterPartialBRefMut IterNonOwningARefMut IterNonOwningBRefMut NoId Ref Mut);
+build_iter2!(IterMutRef IterFullMutRef IterPartialAMutRef IterPartialBMutRef IterNonOwningAMutRef IterNonOwningBMutRef NoId Mut Ref);
+build_iter2!(IterMutMut IterFullMutMut IterPartialAMutMut IterPartialBMutMut IterNonOwningAMutMut IterNonOwningBMutMut NoId Mut Mut);
+build_iter2!(IterIdRefRef IterFullIdRefRef IterPartialAIdRefRef IterPartialBIdRefRef IterNonOwningAIdRefRef IterNonOwningBIdRefRef Id Ref Ref);
+build_iter2!(IterIdRefMut IterFullIdRefMut IterPartialAIdRefMut IterPartialBIdRefMut IterNonOwningAIdRefMut IterNonOwningBIdRefMut Id Ref Mut);
+build_iter2!(IterIdMutRef IterFullIdMutRef IterPartialAIdMutRef IterPartialBIdMutRef IterNonOwningAIdMutRef IterNonOwningBIdMutRef Id Mut Ref);
+build_iter2!(IterIdMutMut IterFullIdMutMut IterPartialAIdMutMut IterPartialBIdMutMut IterNonOwningAIdMutMut IterNonOwningBIdMutMut Id Mut Mut);
 
 #[cfg(test)]
 mod tests{
@@ -468,8 +528,10 @@ mod tests{
         dbg!(TypeId::of::<char>());
         // dbg!(&world);
 
-        // world.make_group::<char,u32>(true,true);
-        world.make_group::<char,u32>(false,false);
+        world.make_group::<char,u32>(true,true);
+        // world.make_group::<char,u32>(true,false);
+        // world.make_group::<char,u32>(false,true);
+        // world.make_group::<char,u32>(false,false);
 
 
         world.create_entity().attach('c');
@@ -480,7 +542,7 @@ mod tests{
         world.create_entity().attach('g');
         world.create_entity().attach(4u32);
 
-        for (id,a,b) in world.query::<(EntityId,&char,&u32)>() {
+        for (id,a,b) in world.query::<(EntityId,&u32,&char)>() {
             println!("{}:{:?},{}",id,a,b)
         }
     }
