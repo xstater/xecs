@@ -229,9 +229,8 @@ impl Debug for World {
 
 #[cfg(test)]
 mod tests{
-    use crate::{EntityId, World};
+    use crate::{World};
     use crate::group::Group;
-    use std::any::TypeId;
 
     #[test]
     fn component_test(){
@@ -251,77 +250,6 @@ mod tests{
         assert_eq!(world.components_ref::<char>().as_ref(),&['a']);
     }
 
-    #[test]
-    fn test(){
-        #[derive(Debug)]
-        struct Fuck(i32);
-        #[derive(Debug)]
-        struct Shit(char);
-
-        let mut world = World::new();
-        world.register::<Fuck>();
-        world.register::<Shit>();
-
-        let id1 = world.create_entity()
-            .attach(Shit('a'))
-            .into_id();
-        world.create_entity()
-            .attach(Fuck(2))
-            .attach(Shit('b'))
-            .attach(Shit('c'));
-        for c in 'a'..='z' {
-            world.create_entity()
-                .attach(Shit(c));
-        }
-        world.detach_component::<Shit>(id1);
-        world.detach_component::<Shit>(EntityId::new(4).unwrap());
-        world.detach_component::<Shit>(EntityId::new(5).unwrap());
-
-
-        world.create_entity()
-            .attach(Fuck(3));
-        world.create_entity()
-            .attach(Fuck(2));
-        world.create_entity()
-            .attach(Fuck(5));
-        world.create_entity()
-            .attach(Fuck(7));
-        println!("Shit:{:?}",world.components_ref::<Shit>());
-        println!("Fuck:{:?}",world.components_ref::<Fuck>());
-
-        // world.create_entity().with(Fuck(2)).build();
-        // let entity = world
-        //     .create_entity()
-        //     .with(Fuck(2))
-        //     .with(Shit('c'))
-        //     .build();
-        //
-        // for (entity, fuck) in world.query::<Fuck>().with_entity().get() {
-        //
-        // }
-        //
-        // for (fuck,shit) in world.query::<Fuck>().with::<Shit>().get() {
-        //
-        // }
-        //
-        // let fuck_system = |&mut world| {
-        //     for (entity,fuck) in world.query::<Fuck>().with_entity() {
-        //         println!("{}",fuck.0);
-        //     }
-        // }.into_system("fuck_system");
-        //
-        // let fuck_shit_system = |&mut world| {
-        //     for (fuck,shit) in world.query::<(&Fuck,&mut Shit)>() {
-        //         println!("{} {}",fuck.0,shit.0);
-        //     }
-        // }.into_system("fuck_shit_system");
-        //
-        // world
-        //     .add_system(fuck_system,&[])
-        //     .add_system(fuck_shit_system,&["fuck_shit_system"]);
-        //
-        // world.run();
-    }
 
     #[test]
     fn group_test(){
@@ -387,31 +315,6 @@ mod tests{
             println!("{:?}",group);
         }
 
-    }
-
-    #[test]
-    fn query_test() {
-        let mut world = World::new();
-
-        world.register::<char>();
-        world.register::<u32>();
-
-        dbg!(world.components.contains_key(&TypeId::of::<u32>()));
-        dbg!(world.components.contains_key(&TypeId::of::<char>()));
-
-        world.create_entity()
-            .attach('a')
-            .attach(1u32);
-        world.create_entity()
-            .attach('b')
-            .attach(2u32);
-        world.create_entity()
-            .attach('c')
-            .attach(3u32);
-
-        // for (ch,num) in world.query::<(char,u32)>() {
-        //     dbg!((ch,num))
-        // }
     }
 
     #[test]
