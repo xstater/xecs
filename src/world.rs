@@ -159,6 +159,28 @@ impl World {
         }
     }
 
+    pub fn entity_component_ref<T : Component>(&self,entity_id : EntityId) -> Option<Ref<'_,T>> {
+        let storage = self.components_storage_ref();
+        if storage.exist(entity_id) {
+            Some(Ref::map(storage, |sparse_set| {
+                sparse_set.get(entity_id).unwrap()
+            }))
+        } else {
+            None
+        }
+    }
+
+    pub fn entity_component_mut<T : Component>(&self,entity_id : EntityId) -> Option<RefMut<'_,T>> {
+        let storage = self.components_storage_mut();
+        if storage.exist(entity_id) {
+            Some(RefMut::map(storage, |sparse_set| {
+                sparse_set.get_mut(entity_id).unwrap()
+            }))
+        } else {
+            None
+        }
+    }
+
     pub fn make_group<A : Component,B : Component>(&mut self,owning_a : bool,owning_b : bool){
         debug_assert!(
             {

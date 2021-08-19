@@ -1,5 +1,6 @@
 use std::num::NonZeroUsize;
 use crate::{World, Component};
+use std::cell::{Ref, RefMut};
 
 pub type EntityId = NonZeroUsize;
 pub type Entities = [EntityId];
@@ -30,6 +31,18 @@ impl<'a> EntityRef<'a>{
     pub fn detach<T : Component>(self) -> EntityRef<'a>{
         self.world.detach_component::<T>(self.id);//ignore the error
         self
+    }
+
+    pub fn component_ref<T : Component>(&'a self) -> Ref<'a,T>{
+        // unwrap here
+        // because id must be a valid ID
+        self.world.entity_component_ref(self.id).unwrap()
+    }
+
+    pub fn component_mut<T : Component>(&'a self) -> RefMut<'a,T>{
+        // unwrap here
+        // because id must be a valid ID
+        self.world.entity_component_mut(self.id).unwrap()
     }
 }
 
