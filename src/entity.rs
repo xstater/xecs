@@ -132,6 +132,7 @@ impl EntityManager {
         self.entities.as_slice()
     }
 
+    #[allow(dead_code)]
     pub(in crate) fn len(&self) -> usize {
         self.entities.len()
     }
