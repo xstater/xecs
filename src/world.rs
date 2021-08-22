@@ -9,7 +9,6 @@ use crate::entity::{EntityRef, EntityManager};
 use crate::group::{Group, NonOwningGroup, OwningType, OwningGroup};
 use std::fmt::{Debug, Formatter};
 use crate::query::{Queryable};
-use std::intrinsics::type_id;
 
 /// World is core struct of xecs.It manages all entities and components.Using RefCell to ensure the
 /// borrow relations.

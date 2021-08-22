@@ -289,7 +289,7 @@ mod tests{
 
         stage.run();
 
-        stage.inactive::<PrintSystem>();
+        stage.deactivate::<PrintSystem>();
 
         stage.run();
     }
