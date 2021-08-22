@@ -1,5 +1,6 @@
+//! Stage struct
 use crate::World;
-use crate::systems::{System, Run, Dependencies};
+use crate::system::{System, Run, Dependencies};
 use std::collections::HashMap;
 use std::any::{TypeId};
 use std::cell::{RefCell, Ref, RefMut};
@@ -12,6 +13,7 @@ struct SystemInfo {
     system : RefCell<Box<dyn Run>>
 }
 
+/// Stage = World + Systems
 pub struct Stage{
     world : RefCell<World>,
     systems : HashMap<TypeId,SystemInfo>,
@@ -30,6 +32,7 @@ impl Debug for Stage {
 }
 
 impl Stage {
+    /// Create a stage with a empty world.
     pub fn new() -> Stage {
         Stage {
             world: RefCell::new(World::new()),
@@ -39,6 +42,7 @@ impl Stage {
         }
     }
 
+    /// Create a stage with determined world.
     pub fn from_world(world : World) -> Stage {
         Stage {
             world : RefCell::new(world),
@@ -47,7 +51,7 @@ impl Stage {
             run_sequence : vec![]
         }
     }
-
+    /// Add a normal system in stage.
     pub fn add_system<T : for<'a> System<'a>>(&mut self,system : T){
         self.need_update = true;
         self.systems.insert(
@@ -61,6 +65,7 @@ impl Stage {
         );
     }
 
+    /// Add a system that run only once in stage.
     pub fn add_once_system<T : for<'a> System<'a>>(&mut self,system : T){
         self.need_update = true;
         self.systems.insert(
@@ -74,11 +79,16 @@ impl Stage {
         );
     }
 
+    /// Check if stage has such system.
     pub(in crate) fn has_system<T : for<'a> System<'a>>(&self) -> bool {
         self.systems.contains_key(&TypeId::of::<T>())
     }
 
-    pub fn inactive<T : for<'a> System<'a>>(&mut self) {
+    /// Deactivate a system.
+    /// ### Detail
+    /// * A deactivated system will not be executed in stage run.
+    /// * The depended systems also will not be executed too.
+    pub fn deactivate<T : for<'a> System<'a>>(&mut self) {
         debug_assert!(self.has_system::<T>(),
                       "There is no such system in stage");
         self.systems
@@ -87,7 +97,10 @@ impl Stage {
             .is_active = false;
     }
 
-    pub fn active<T : for<'a> System<'a>>(&mut self) {
+    /// Activate a system.
+    /// ### Detail
+    /// The system is activated by default.
+    pub fn activate<T : for<'a> System<'a>>(&mut self) {
         debug_assert!(self.has_system::<T>(),
                       "There is no such system in stage");
         self.systems
@@ -95,6 +108,8 @@ impl Stage {
             .unwrap()
             .is_active = true;
     }
+
+    /// Get a reference of System data.
     pub fn system_data_ref<T : for<'a> System<'a>>(&self) -> Ref<'_,T> {
         debug_assert!(self.has_system::<T>(),
                     "There is no such system in stage");
@@ -109,6 +124,7 @@ impl Stage {
     }
 
 
+    /// Get a mutable reference of System data.
     pub fn system_data_mut<T : for<'a> System<'a>>(&self) -> RefMut<'_,T> {
         debug_assert!(self.has_system::<T>(),
                       "There is no such system in stage");
@@ -122,14 +138,20 @@ impl Stage {
         })
     }
 
+    /// Get a reference of world in stage.
     pub fn world_ref(&self) -> Ref<'_,World> {
         self.world.borrow()
     }
 
+    /// Get a mutable reference of world in stage.
     pub fn world_mut(&self) -> RefMut<'_,World> {
         self.world.borrow_mut()
     }
 
+    /// Execute all systems in stage.
+    /// ### Details
+    /// * Once Systems will be removed after ran.
+    /// * System will be ran with topological order
     pub fn run(&mut self) {
         //topological sort
         if self.need_update {
@@ -195,7 +217,7 @@ impl Stage {
 mod tests{
     use crate::World;
     use crate::stage::Stage;
-    use crate::systems::{System};
+    use crate::system::{System};
     use crate::resource::Resource;
 
     #[test]

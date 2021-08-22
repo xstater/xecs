@@ -1,3 +1,24 @@
+//! # 3 types of group , can be used for improving the speed of iteration
+//! # Motivation
+//! XECS stores entities with sparse set which can fast iterate and quickly get data from a sparse ID.
+//! Sparse set has a dense array, if we can re-arrange the order of entities in dense array,we will get
+//! much improvement of iterating speed.
+//! # Owned component or Non-Owned component
+//! if a components can be re-sorted ,we call it was owned by a group.Each component can only be owned
+//! by one Group.
+//! # Group type
+//! ### Full-Owning Group
+//! This group owns 2 components.It can get the fastest speed of iteration.
+//! ### Partial-Owning Group
+//! This group only owns 1 component.The iteration speed is slow than Full-Owning group.
+//! ### Non-Owning group
+//! This group doesn't own any component.It need another sparse set for recording some iteration information.
+//! The speed is the slowest in 3 type groups,but it's faster than raw query iter in average situation.
+//! # Example
+//! Usually create a group by ```World::make_query()```
+//! ```no_run
+//! world.make_group::<(Position,Particle)>(true,true);//full-owning group
+//! ```
 use std::any::{TypeId};
 use crate::sparse_set::SparseSet;
 use crate::{EntityId, World, Component};

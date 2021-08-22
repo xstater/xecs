@@ -1,3 +1,4 @@
+//! # world struct
 use crate::{EntityId, Component, Entities};
 use std::collections::HashMap;
 use std::any::TypeId;
@@ -8,7 +9,10 @@ use crate::entity::{EntityRef, EntityManager};
 use crate::group::{Group, NonOwningGroup, OwningType, OwningGroup};
 use std::fmt::{Debug, Formatter};
 use crate::query::{Queryable};
+use std::intrinsics::type_id;
 
+/// World is core struct of xecs.It manages all entities and components.Using RefCell to ensure the
+/// borrow relations.
 pub struct World {
     entity_manager : EntityManager,
     // Box<SparseSet<EntityId,Component>>
@@ -17,6 +21,7 @@ pub struct World {
 }
 
 impl World {
+    /// Create a empty world.
     pub fn new() -> World {
         World {
             entity_manager : EntityManager::new(),
@@ -25,11 +30,14 @@ impl World {
         }
     }
 
+    /// Register a component.
+    /// # Detail
+    /// Do nothing if component has been registered.
     pub fn register<T : Component>(&mut self) {
         let type_id = TypeId::of::<T>();
-        debug_assert!(
-            !self.components.contains_key(&type_id),
-            "Cannot register a component as twice");
+        if self.components.contains_key(&type_id) {
+            return;
+        }
         self.components.insert(
            type_id,
             RefCell::new(
@@ -39,11 +47,13 @@ impl World {
         );
     }
 
+    /// Create an empty entity in world, return an EntityRef.
     pub fn create_entity(&mut self) -> EntityRef<'_>{
         let id = self.entity_manager.create();
         EntityRef::new(self,id)
     }
 
+    /// Remove an entity and its components.
     pub fn remove_entity(&mut self,entity_id : EntityId){
         self.entity_manager.remove(entity_id);
         //remove all components of this entity
@@ -100,6 +110,7 @@ impl World {
         })
     }
 
+    /// Attach a component to an entity.
     pub fn attach_component<T : Component>(&mut self,entity_id : EntityId,component : T){
         self.components_storage_mut::<T>()
             .add(entity_id,component);
@@ -111,6 +122,7 @@ impl World {
         }
     }
 
+    /// Detach a component from an entity.
     pub fn detach_component<T : Component>(&mut self,entity_id : EntityId) -> Option<T>{
         for group in &self.groups {
             let mut group = group.borrow_mut();
@@ -122,6 +134,7 @@ impl World {
             .remove(entity_id)
     }
 
+    /// Get a reference of all components.
     pub fn components_ref<T : Component>(&self) -> Ref<'_,[T]>{
         let slice_ref = self.components_storage_ref::<T>();
         Ref::map(slice_ref,|raw|{
@@ -129,6 +142,7 @@ impl World {
         })
     }
 
+    /// Get a mutable reference of all components.
     pub fn components_mut<T : Component>(&self) -> RefMut<'_,[T]>{
         let slice_mut = self.components_storage_mut::<T>();
         RefMut::map(slice_mut,|raw|{
@@ -136,10 +150,12 @@ impl World {
         })
     }
 
+    /// Get all entities' id.
     pub fn entities(&self) -> &Entities {
         self.entity_manager.entities()
     }
 
+    /// Get all entities' id of a component
     pub fn entities_in<T : Component>(&self) -> Ref<'_,Entities> {
         let storage = self.components_storage_ref::<T>();
         Ref::map(storage,|raw|{
@@ -147,10 +163,12 @@ impl World {
         })
     }
 
+    /// Check if an id exists in world.
     pub fn exist(&mut self,entity_id : EntityId) -> bool {
         self.entity_manager.has(entity_id)
     }
 
+    /// Get an EntityRef from an EntityId, return None if id doesn't exist in world.
     pub fn entity(&mut self,entity_id : EntityId) -> Option<EntityRef<'_>> {
         if self.exist(entity_id) {
             Some(EntityRef::new(self, entity_id))
@@ -159,6 +177,7 @@ impl World {
         }
     }
 
+    /// Get a reference of component of entity, return None if id doesn't exist in world.
     pub fn entity_component_ref<T : Component>(&self,entity_id : EntityId) -> Option<Ref<'_,T>> {
         let storage = self.components_storage_ref();
         if storage.exist(entity_id) {
@@ -170,6 +189,7 @@ impl World {
         }
     }
 
+    /// Get a mutable reference of component of entity, return None if id doesn't exist in world.
     pub fn entity_component_mut<T : Component>(&self,entity_id : EntityId) -> Option<RefMut<'_,T>> {
         let storage = self.components_storage_mut();
         if storage.exist(entity_id) {
@@ -181,6 +201,22 @@ impl World {
         }
     }
 
+    /// Make a group to accelerate the iteration.
+    /// ## Details
+    /// See [group](crate::group)
+    /// ### Examples
+    /// Create a full-owning group
+    /// ```no_run
+    /// world.make_group::<Position,Particle>(true,true);
+    /// ```
+    /// Create a partial-owning group
+    /// ```no_run
+    /// world.make_group::<Position,Particle>(true,false);
+    /// ```
+    /// Create a non-owning group
+    /// ```no_run
+    /// world.make_group::<Position,Particle>(false,false);
+    /// ```
     pub fn make_group<A : Component,B : Component>(&mut self,owning_a : bool,owning_b : bool){
         debug_assert!(
             {
@@ -229,6 +265,9 @@ impl World {
             })
     }
 
+    /// Query entities
+    /// ## Details
+    /// See [query](crate::query)
     pub fn query<'a,T : Queryable<'a>>(&'a self) -> Box<dyn Iterator<Item=<T as Queryable>::Item> + 'a> {
         <T as Queryable<'a>>::query(self)
     }

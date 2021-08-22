@@ -1,9 +1,12 @@
+//! # Query traits and lots of iterators
+//! # Warning : These Iterators are created by macro
 use crate::{Component, World, EntityId};
 use std::cell::{Ref, RefMut};
 use crate::group::Group;
 use crate::sparse_set::SparseSet;
 use std::any::TypeId;
 
+/// Something can be queried in world
 pub trait Queryable<'a>{
     type Item;
 

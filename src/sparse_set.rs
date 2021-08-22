@@ -1,3 +1,4 @@
+//! Spare Set from xsparseset repo
 use std::num::NonZeroUsize;
 
 #[derive(Debug,Clone)]

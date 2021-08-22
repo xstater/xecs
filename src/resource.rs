@@ -1,8 +1,10 @@
+//! # Resource Trait and it's impl
 use crate::stage::Stage;
-use crate::systems::System;
+use crate::system::System;
 use std::cell::{Ref, RefMut};
 use crate::World;
 
+/// Resource is system required data while running
 pub trait Resource<'a> {
     type Type;
     fn resource(stage : &'a Stage) -> Self::Type;

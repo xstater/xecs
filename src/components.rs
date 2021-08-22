@@ -1,10 +1,13 @@
+//! # Component core trait
 use crate::sparse_set::SparseSet;
 use crate::EntityId;
 
+/// Component is just a trait : Send + Sync + 'static.<br>
+/// XECS automatically impl this trait for all suitable structs
 pub trait Component : Send + Sync + 'static {}
 impl<T : Send + Sync + 'static> Component for T{}
 
-pub trait ComponentStorage {
+pub(in crate) trait ComponentStorage {
     fn has(&self,entity_id : EntityId) -> bool;
     fn index(&self,entity_id : EntityId) -> Option<usize>;
     fn remove(&mut self,entity_id : EntityId);

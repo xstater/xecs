@@ -1,10 +1,14 @@
+//! # Some structs for Entity
 use std::num::NonZeroUsize;
 use crate::{World, Component};
 use std::cell::{Ref, RefMut};
 
+/// An ID of entity ,starting at 1 ,can be re-used
 pub type EntityId = NonZeroUsize;
+/// A slice of EntityId
 pub type Entities = [EntityId];
 
+/// A useful struct for manipulating a entity
 #[derive(Debug)]
 pub struct EntityRef<'a>{
     world : &'a mut World,
@@ -19,26 +23,31 @@ impl<'a> EntityRef<'a>{
         }
     }
 
+    /// Consume EntityRef and return a valid EntityId
     pub fn into_id(self) -> EntityId{
         self.id
     }
 
+    /// Attach a component to this entity
     pub fn attach<T : Component>(self,component : T) -> EntityRef<'a>{
         self.world.attach_component(self.id,component);
         self
     }
 
+    /// Detach a component from this entity
     pub fn detach<T : Component>(self) -> EntityRef<'a>{
         self.world.detach_component::<T>(self.id);//ignore the error
         self
     }
 
+    /// Get a reference of this entity's component
     pub fn component_ref<T : Component>(&'a self) -> Ref<'a,T>{
         // unwrap here
         // because id must be a valid ID
         self.world.entity_component_ref(self.id).unwrap()
     }
 
+    /// Get a mutable reference of this entity's component
     pub fn component_mut<T : Component>(&'a self) -> RefMut<'a,T>{
         // unwrap here
         // because id must be a valid ID

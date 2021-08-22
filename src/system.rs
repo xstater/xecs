@@ -1,14 +1,22 @@
+//! # System trait and Dependencies trait
 use crate::stage::Stage;
 use std::any::{TypeId};
 use crate::resource::Resource;
 
+/// ## System trait
+/// * System can has it owm data like ```struct Event(u32)```
+/// * System can get other systems' data in Resource
 pub trait System<'a> : 'static{
+    /// Required data while system running.
     type Resource : Resource<'a>;
+    /// The Dependencies of system
     type Dependencies : Dependencies;
+    /// update the states
     #[allow(unused_variables)]
     fn update(&'a mut self,resource : <Self::Resource as Resource<'a>>::Type){}
 }
 
+/// Something can be dependencies of systems
 pub trait Dependencies {
     fn dependencies() -> Vec<TypeId>;
 }
@@ -117,7 +125,7 @@ impl<'a> dyn 'static + Run {
 
 #[cfg(test)]
 mod tests{
-    use crate::systems::{System, Dependencies};
+    use crate::system::{System, Dependencies};
     use std::any::TypeId;
 
     #[test]
