@@ -1,7 +1,15 @@
 [package]
 name = "xecs"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["xstater@a166224@gmail.com"]
 edition = "2018"
+license = "MIT"
+description = "A rust grouped Entity-Component-System library"
+documentation = "https://docs.rs/xecs/"
+readme = "README.md"
+repository = "https://github.com/xstater/xecs/"
+keywords = ["gamedev","ecs","game-engine"]
+categories = ["game-development","game-engines"]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
