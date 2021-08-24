@@ -4,19 +4,19 @@ xecs is a rust Entity-Component-System library
 XECS is a Grouped ECS library.
 # Examples
 ### Create an empty world
-```no_run
+```rust
 let mut world = World::new();
 ```
 ### Register some components
 Component is T : Send + Sync + 'static
-```no_run
+```rust
 struct Position(f64,f64,f64);
 struct Particle;
 world.register::<Position>();
 world.register::<Particle>();
 ```
 ### Create 100 entity with Position and Particle components
-```no_run
+```rust
 for _ in 0..100 {
     world
         .create_entity()
@@ -26,13 +26,11 @@ for _ in 0..100 {
 
 ```
 ### Make a full-owning group to improve the performance of query iteration
-```no_run
+```rust
 world.make_group::<(Particle,Position)>(true,true);
 ```
 ### Create a system and update all entities with position and particle components
-```no_run
-# use xecs::{System, World};
-# use std::cell::RefMut;
+```rust
 struct UpdatePosition;
 impl<'a> System<'a> for UpdatePosition {
     type Resource = (&'a mut World);
@@ -48,8 +46,7 @@ impl<'a> System<'a> for UpdatePosition {
 }
 ```
 ### Add system to stage and run this stage
-```no_run
-# use xecs::Stage;
+```rust
 let mut stage = Stage::from_world(world);
 stage.add_system(UpdatePosition);
 stage.run();
