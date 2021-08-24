@@ -1,10 +1,11 @@
 //! Stage struct
 use crate::World;
-use crate::system::{System, Run, Dependencies};
+use crate::system::{System, Run, Dependencies, End};
 use std::collections::HashMap;
 use std::any::{TypeId};
 use std::cell::{RefCell, Ref, RefMut};
 use std::fmt::{Debug, Formatter};
+use std::option::Option::Some;
 
 struct SystemInfo {
     dependencies : Vec<TypeId>,
@@ -18,7 +19,7 @@ pub struct Stage{
     world : RefCell<World>,
     systems : HashMap<TypeId,SystemInfo>,
     need_update : bool,
-    run_sequence : Vec<TypeId>
+    run_queue : Vec<TypeId>
 }
 
 impl Debug for Stage {
@@ -26,7 +27,7 @@ impl Debug for Stage {
         f
             .debug_struct("Stage")
             .field("world",&self.world)
-            .field("systems id",&self.run_sequence)
+            .field("systems id",&self.run_queue)
             .finish()
     }
 }
@@ -37,8 +38,8 @@ impl Stage {
         Stage {
             world: RefCell::new(World::new()),
             systems: HashMap::new(),
-            need_update : false,
-            run_sequence : vec![]
+            need_update: false,
+            run_queue: vec![]
         }
     }
 
@@ -47,12 +48,12 @@ impl Stage {
         Stage {
             world : RefCell::new(world),
             systems : HashMap::new(),
-            need_update : false,
-            run_sequence : vec![]
+            need_update: false,
+            run_queue: vec![]
         }
     }
     /// Add a normal system in stage.
-    pub fn add_system<T : for<'a> System<'a>>(&mut self,system : T){
+    pub fn add_system<T : for<'a> System<'a>>(&mut self,system : T) -> &mut Self{
         self.need_update = true;
         self.systems.insert(
             TypeId::of::<T>(),
@@ -63,10 +64,11 @@ impl Stage {
                 system : RefCell::new(Box::new(system))
             }
         );
+        self
     }
 
     /// Add a system that run only once in stage.
-    pub fn add_once_system<T : for<'a> System<'a>>(&mut self,system : T){
+    pub fn add_once_system<T : for<'a> System<'a>>(&mut self,system : T) -> &mut Self{
         self.need_update = true;
         self.systems.insert(
             TypeId::of::<T>(),
@@ -77,6 +79,7 @@ impl Stage {
                 system: RefCell::new(Box::new(system))
             }
         );
+        self
     }
 
     /// Check if stage has such system.
@@ -88,25 +91,27 @@ impl Stage {
     /// ### Detail
     /// * A deactivated system will not be executed in stage run.
     /// * The depended systems also will not be executed too.
-    pub fn deactivate<T : for<'a> System<'a>>(&mut self) {
+    pub fn deactivate<T : for<'a> System<'a>>(&mut self) -> &mut Self{
         debug_assert!(self.has_system::<T>(),
                       "There is no such system in stage");
         self.systems
             .get_mut(&TypeId::of::<T>())
             .unwrap()
             .is_active = false;
+        self
     }
 
     /// Activate a system.
     /// ### Detail
     /// The system is activated by default.
-    pub fn activate<T : for<'a> System<'a>>(&mut self) {
+    pub fn activate<T : for<'a> System<'a>>(&mut self) -> &mut Self {
         debug_assert!(self.has_system::<T>(),
                       "There is no such system in stage");
         self.systems
             .get_mut(&TypeId::of::<T>())
             .unwrap()
             .is_active = true;
+        self
     }
 
     /// Get a reference of System data.
@@ -153,61 +158,78 @@ impl Stage {
     /// * Once Systems will be removed after ran.
     /// * System will be ran with topological order
     pub fn run(&mut self) {
-        //topological sort
-        if self.need_update {
-            self.run_sequence.clear();
-            let mut deps = HashMap::new();
-            for (type_id,_) in &self.systems {
-                deps.insert(*type_id, (0_usize, vec![]));
-            }
-            for (type_id,system_info) in &self.systems {
-                {
-                    let (enter_count, _) = deps.get_mut(&type_id).unwrap();
-                    *enter_count = system_info.dependencies.len();
-                }
-                for dep in &system_info.dependencies {
-                    if let Some((_,leave_edges)) = deps.get_mut(dep) {
-                        leave_edges.push(*type_id);
-                    } else {
-                        panic!("No such depend system");
-                    }
-                }
-            }
-            fn get_zero(deps : &HashMap<TypeId,(usize,Vec<TypeId>)>) -> Option<TypeId> {
-                for (tid,(enter_count,_)) in deps {
-                    if *enter_count == 0 {
-                        return Some(*tid);
-                    }
-                }
-                None
-            }
-            while let Some(type_id) = get_zero(&deps) {
-                self.run_sequence.push(type_id);
-                let (_,leave_edges) = deps.remove(&type_id).unwrap();
-                for edge in leave_edges {
-                    let (enter_count,_) = deps.get_mut(&edge).unwrap();
-                    *enter_count -= 1;
-                }
-            }
-        }
-        self.need_update = false;
-
+        self.update();
         let mut remove_list = vec![];
-        for type_id in &self.run_sequence {
-            let system_info = self.systems.get(type_id).unwrap();
-            if system_info.is_active {
-                let mut system = system_info.system.borrow_mut();
-                system.run(&self);
-                if system_info.is_once {
+        for type_id in &self.run_queue {
+            let system = self.systems
+                .get(type_id)
+                .unwrap();
+            if system.is_active {
+                if system.is_once {
                     remove_list.push(*type_id);
                 }
+                system.system.borrow_mut().run(self);
             }
         }
-        if !remove_list.is_empty() {
-            self.need_update = true;
-            for type_id in remove_list {
-                self.systems.remove(&type_id);
+        for type_id in remove_list {
+            self.systems.remove(&type_id);
+        }
+    }
+
+    fn update(&mut self) {
+        if !self.need_update {
+            return;
+        }
+        self.run_queue.clear();
+        let mut inverse_map = HashMap::new();
+        let mut enter_edges_count = HashMap::new();
+        // initialization
+        for (type_id,system_info) in &self.systems {
+            inverse_map.insert(*type_id,vec![]);
+            enter_edges_count.insert(*type_id,system_info.dependencies.len());
+        }
+        inverse_map.insert(TypeId::of::<End>(),vec![]);
+        // build inverse map
+        for (self_type,self_system_info) in &self.systems {
+            for dep_sys in &self_system_info.dependencies {
+                inverse_map.get_mut(dep_sys)
+                    .unwrap()
+                    .push(*self_type)
             }
+        }
+        // topological sort
+        fn find_zero(map : &HashMap<TypeId,usize>) -> Option<TypeId> {
+            for (type_id,count) in map {
+                // ignore the End
+                if *type_id == TypeId::of::<End>() {
+                    continue
+                }
+                if *count == 0 {
+                    return Some(*type_id);
+                }
+            }
+            None
+        }
+        fn sort(inverse_map : &HashMap<TypeId,Vec<TypeId>>,
+                enter_edges_count : &mut HashMap<TypeId,usize>,
+                run_queue : &mut Vec<TypeId>) {
+            while let Some(type_id) = find_zero(enter_edges_count) {
+                enter_edges_count.remove(&type_id);
+                run_queue.push(type_id);
+                for system in inverse_map.get(&type_id).unwrap().iter() {
+                    let count = enter_edges_count.get_mut(system).unwrap();
+                    *count -= 1;
+                }
+            }
+        }
+        sort(&inverse_map,&mut enter_edges_count,&mut self.run_queue);
+        // sort remain systems
+        if let Some(systems) = inverse_map.get(&TypeId::of::<End>()) {
+            for system in systems.iter() {
+                let count = enter_edges_count.get_mut(system).unwrap();
+                *count -= 1;
+            }
+            sort(&inverse_map, &mut enter_edges_count, &mut self.run_queue);
         }
     }
 
@@ -217,7 +239,7 @@ impl Stage {
 mod tests{
     use crate::World;
     use crate::stage::Stage;
-    use crate::system::{System};
+    use crate::system::{System, End};
     use crate::resource::Resource;
 
     #[test]
@@ -239,6 +261,7 @@ mod tests{
         #[derive(Debug)]
         struct DataSystemAge(u32);
         struct AfterAll;
+        struct LastOfEnd;
 
         impl<'a> System<'a> for StartSystem {
             type Resource = ();
@@ -272,18 +295,28 @@ mod tests{
 
         impl<'a> System<'a> for AfterAll {
             type Resource = ();
-            type Dependencies = (PrintSystem,DataSystemName,DataSystemAge);
+            type Dependencies = End;
 
             fn update(&'a mut self, _resource: <Self::Resource as Resource<'a>>::Type) {
                 println!("Finished");
             }
         }
+        impl<'a> System<'a> for LastOfEnd {
+            type Resource = ();
+            type Dependencies = End;
 
-        stage.add_system(StartSystem);
-        stage.add_system(PrintSystem);
-        stage.add_system(DataSystemName("asda".to_string()));
-        stage.add_system(DataSystemAge(13));
-        stage.add_once_system(AfterAll);
+            fn update(&'a mut self, _resource: <Self::Resource as Resource<'a>>::Type) {
+                println!("Finished!!!");
+            }
+        }
+
+        stage
+            .add_system(StartSystem)
+            .add_system(PrintSystem)
+            .add_system(DataSystemName("asda".to_string()))
+            .add_system(DataSystemAge(13))
+            .add_once_system(AfterAll)
+            .add_system(LastOfEnd);
 
         stage.run();
 
@@ -291,6 +324,9 @@ mod tests{
 
         stage.deactivate::<PrintSystem>();
 
+        stage.run();
+
+        stage.activate::<PrintSystem>();
         stage.run();
     }
 }

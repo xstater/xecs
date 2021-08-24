@@ -123,6 +123,34 @@ impl<'a> dyn 'static + Run {
     }
 }
 
+/// ### A special Dependent struct
+/// if a system depends on this struct ,
+/// this system will run in the end.
+/// ## Example
+/// ```
+/// # use xecs::System;
+/// use xecs::resource::Resource;
+/// use xecs::system::End;
+/// struct Clear;
+/// impl<'a> System<'a> for Clear {
+///     type Resource = ();
+///     type Dependencies = End;
+///
+///     fn update(&'a mut self, resource: <Self::Resource as Resource<'a>>::Type) {
+///         // DO STH WORK
+///     }
+/// }
+/// ```
+#[derive(Debug,Default,Copy,Clone)]
+pub struct End;
+
+impl Dependencies for End {
+    fn dependencies() -> Vec<TypeId> {
+        vec![TypeId::of::<End>()]
+    }
+}
+
+
 #[cfg(test)]
 mod tests{
     use crate::system::{System, Dependencies};
