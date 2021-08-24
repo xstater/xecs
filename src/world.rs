@@ -32,10 +32,10 @@ impl World {
     /// Register a component.
     /// # Detail
     /// Do nothing if component has been registered.
-    pub fn register<T : Component>(&mut self) {
+    pub fn register<T : Component>(&mut self) -> &mut Self {
         let type_id = TypeId::of::<T>();
         if self.components.contains_key(&type_id) {
-            return;
+            return self;
         }
         self.components.insert(
            type_id,
@@ -44,6 +44,7 @@ impl World {
                     SparseSet::<EntityId,T>::new()
                 ))
         );
+        self
     }
 
     /// Create an empty entity in world, return an EntityRef.
