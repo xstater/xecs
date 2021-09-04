@@ -84,7 +84,13 @@ impl Stage {
 
     /// Check if stage has such system.
     pub(in crate) fn has_system<T : for<'a> System<'a>>(&self) -> bool {
-        self.systems.contains_key(&TypeId::of::<T>())
+        self.has_system_dyn(TypeId::of::<T>())
+    }
+
+
+    /// Check if stage has such system from a dynamic TypeId
+    pub(in crate) fn has_system_dyn(&self,system : TypeId) -> bool {
+        self.systems.contains_key(&system)
     }
 
     /// Deactivate a system.
@@ -92,10 +98,15 @@ impl Stage {
     /// * A deactivated system will not be executed in stage run.
     /// * The depended systems also will not be executed too.
     pub fn deactivate<T : for<'a> System<'a>>(&mut self) -> &mut Self{
-        debug_assert!(self.has_system::<T>(),
+        self.deactivate_dyn(TypeId::of::<T>())
+    }
+
+    /// Same as ```deactivate```
+    pub fn deactivate_dyn(&mut self,system : TypeId) -> &mut Self{
+        debug_assert!(self.has_system_dyn(system),
                       "There is no such system in stage");
         self.systems
-            .get_mut(&TypeId::of::<T>())
+            .get_mut(&system)
             .unwrap()
             .is_active = false;
         self
@@ -105,10 +116,15 @@ impl Stage {
     /// ### Detail
     /// The system is activated by default.
     pub fn activate<T : for<'a> System<'a>>(&mut self) -> &mut Self {
-        debug_assert!(self.has_system::<T>(),
+        self.activate_dyn(TypeId::of::<T>())
+    }
+
+    /// Same as ```activate```
+    pub fn activate_dyn(&mut self,system : TypeId) -> &mut Self {
+        debug_assert!(self.has_system_dyn(system),
                       "There is no such system in stage");
         self.systems
-            .get_mut(&TypeId::of::<T>())
+            .get_mut(&system)
             .unwrap()
             .is_active = true;
         self
