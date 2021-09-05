@@ -146,6 +146,11 @@ impl<'a> dyn 'static + Run {
 ///     type Resource = ();
 ///     type Dependencies = End;
 ///
+///     fn init(&'a mut self, resource: <Self::Resource as Resource<'a>>::Type) {
+///         // initialize data
+///         // or register components
+///     }
+///
 ///     fn update(&'a mut self, resource: <Self::Resource as Resource<'a>>::Type) {
 ///         // DO STH WORK
 ///     }
