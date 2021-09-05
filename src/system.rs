@@ -11,6 +11,9 @@ pub trait System<'a> : 'static{
     type Resource : Resource<'a>;
     /// The Dependencies of system
     type Dependencies : Dependencies;
+    /// initialize the data
+    #[allow(unused_variables)]
+    fn init(&'a mut self,resource : <Self::Resource as Resource<'a>>::Type) {}
     /// update the states
     #[allow(unused_variables)]
     fn update(&'a mut self,resource : <Self::Resource as Resource<'a>>::Type){}
@@ -103,10 +106,17 @@ impl<A,B,C,D,E,F> Dependencies for (A,B,C,D,E,F)
 }
 
 pub(in crate) trait Run{
+    fn initialize(&mut self,stage : &Stage);
     fn run(&mut self,stage : &Stage);
 }
 
 impl<T : for<'a> System<'a>> Run for T {
+    fn initialize(&mut self, stage: &Stage) {
+        //self has type Self:System
+        let resource = <T as System>::Resource::resource(stage);
+        self.init(resource);
+    }
+
     fn run(&mut self, stage: &Stage) {
         //self has type Self:System
         let resource = <T as System>::Resource::resource(stage);

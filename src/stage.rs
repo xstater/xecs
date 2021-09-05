@@ -19,7 +19,8 @@ pub struct Stage{
     world : RefCell<World>,
     systems : HashMap<TypeId,SystemInfo>,
     need_update : bool,
-    run_queue : Vec<TypeId>
+    run_queue : Vec<TypeId>,
+    need_init : Vec<TypeId>
 }
 
 impl Debug for Stage {
@@ -39,7 +40,8 @@ impl Stage {
             world: RefCell::new(World::new()),
             systems: HashMap::new(),
             need_update: false,
-            run_queue: vec![]
+            run_queue: vec![],
+            need_init: vec![]
         }
     }
 
@@ -49,12 +51,14 @@ impl Stage {
             world : RefCell::new(world),
             systems : HashMap::new(),
             need_update: false,
-            run_queue: vec![]
+            run_queue: vec![],
+            need_init: vec![]
         }
     }
     /// Add a normal system in stage.
     pub fn add_system<T : for<'a> System<'a>>(&mut self,system : T) -> &mut Self{
         self.need_update = true;
+        self.need_init.push(TypeId::of::<T>());
         self.systems.insert(
             TypeId::of::<T>(),
             SystemInfo {
@@ -68,8 +72,10 @@ impl Stage {
     }
 
     /// Add a system that run only once in stage.
+    #[deprecated = "Use System::init() !"]
     pub fn add_once_system<T : for<'a> System<'a>>(&mut self,system : T) -> &mut Self{
         self.need_update = true;
+        self.need_init.push(TypeId::of::<T>());
         self.systems.insert(
             TypeId::of::<T>(),
             SystemInfo {
@@ -175,6 +181,16 @@ impl Stage {
     /// * System will be ran with topological order
     pub fn run(&mut self) {
         self.update();
+        // initialize all systems
+        for system_type in self.need_init.iter().cloned() {
+            self.systems
+                .get(&system_type)
+                .unwrap()
+                .system
+                .borrow_mut()
+                .initialize(self);
+        }
+        self.need_init.clear();
         let mut remove_list = vec![];
         for type_id in &self.run_queue {
             let system = self.systems
@@ -303,10 +319,18 @@ mod tests{
         impl<'a> System<'a> for DataSystemName{
             type Resource = ();
             type Dependencies = StartSystem;
+
+            fn init(&'a mut self, _ : ()) {
+                println!("DataSystemName has been added to stage");
+            }
         }
         impl<'a> System<'a> for DataSystemAge {
             type Resource = ();
             type Dependencies = StartSystem;
+
+            fn init(&'a mut self, _ : ()) {
+                println!("DataSystemAge has been added to stage");
+            }
         }
 
         impl<'a> System<'a> for AfterAll {
@@ -331,7 +355,7 @@ mod tests{
             .add_system(PrintSystem)
             .add_system(DataSystemName("asda".to_string()))
             .add_system(DataSystemAge(13))
-            .add_once_system(AfterAll)
+            .add_system(AfterAll)
             .add_system(LastOfEnd);
 
         stage.run();
