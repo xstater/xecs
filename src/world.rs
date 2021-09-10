@@ -34,7 +34,7 @@ impl World {
     /// Do nothing if component has been registered.
     pub fn register<T : Component>(&mut self) -> &mut Self {
         let type_id = TypeId::of::<T>();
-        if self.components.contains_key(&type_id) {
+        if self.has_registered::<T>() {
             return self;
         }
         self.components.insert(
@@ -45,6 +45,12 @@ impl World {
                 ))
         );
         self
+    }
+
+    /// Check if a component has been registered
+    pub fn has_registered<T : Component>(&self) -> bool {
+        let type_id = TypeId::of::<T>();
+        self.components.contains_key(&type_id)
     }
 
     /// Create an empty entity in world, return an EntityRef.
