@@ -65,7 +65,9 @@ impl World {
         //remove all components of this entity
         for (_,storage) in &mut self.components{
             let mut storage = storage.borrow_mut();
-            storage.remove(entity_id);
+            if storage.has(entity_id) {
+                storage.remove(entity_id);
+            }
         }
     }
 
