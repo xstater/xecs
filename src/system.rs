@@ -7,13 +7,14 @@ use crate::resource::Resource;
 /// * System can has it owm data like ```struct Event(u32)```
 /// * System can get other systems' data in Resource
 pub trait System<'a> : 'static{
+    type InitResource : Resource<'a>;
     /// Required data while system running.
     type Resource : Resource<'a>;
     /// The Dependencies of system
     type Dependencies : Dependencies;
     /// initialize the data
     #[allow(unused_variables)]
-    fn init(&'a mut self,resource : <Self::Resource as Resource<'a>>::Type) {}
+    fn init(&'a mut self,resource : <Self::InitResource as Resource<'a>>::Type) {}
     /// update the states
     #[allow(unused_variables)]
     fn update(&'a mut self,resource : <Self::Resource as Resource<'a>>::Type){}
@@ -113,7 +114,7 @@ pub(in crate) trait Run{
 impl<T : for<'a> System<'a>> Run for T {
     fn initialize(&mut self, stage: &Stage) {
         //self has type Self:System
-        let resource = <T as System>::Resource::resource(stage);
+        let resource = <T as System>::InitResource::resource(stage);
         self.init(resource);
     }
 
@@ -174,14 +175,17 @@ mod tests{
     #[test]
     fn dependencies_trait_test() {
         impl<'a> System<'a> for u32{
+            type InitResource = ();
             type Resource = ();
             type Dependencies = ();
         }
         impl<'a> System<'a> for i32{
+            type InitResource = ();
             type Resource = ();
             type Dependencies = ();
         }
         impl<'a> System<'a> for char{
+            type InitResource = ();
             type Resource = ();
             type Dependencies = ();
         }

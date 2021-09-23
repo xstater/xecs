@@ -296,6 +296,7 @@ mod tests{
         struct LastOfEnd;
 
         impl<'a> System<'a> for StartSystem {
+            type InitResource = ();
             type Resource = ();
             type Dependencies = ();
 
@@ -305,6 +306,7 @@ mod tests{
         }
 
         impl<'a> System<'a> for PrintSystem {
+            type InitResource = ();
             type Resource = (&'a World,&'a DataSystemName,&'a mut DataSystemAge);
             type Dependencies = StartSystem;
 
@@ -317,6 +319,7 @@ mod tests{
         }
 
         impl<'a> System<'a> for DataSystemName{
+            type InitResource = ();
             type Resource = ();
             type Dependencies = StartSystem;
 
@@ -325,6 +328,7 @@ mod tests{
             }
         }
         impl<'a> System<'a> for DataSystemAge {
+            type InitResource = ();
             type Resource = ();
             type Dependencies = StartSystem;
 
@@ -334,6 +338,7 @@ mod tests{
         }
 
         impl<'a> System<'a> for AfterAll {
+            type InitResource = ();
             type Resource = ();
             type Dependencies = End;
 
@@ -342,6 +347,7 @@ mod tests{
             }
         }
         impl<'a> System<'a> for LastOfEnd {
+            type InitResource = ();
             type Resource = ();
             type Dependencies = End;
 
