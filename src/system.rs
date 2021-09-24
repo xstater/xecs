@@ -193,8 +193,8 @@ impl Dependencies for End {
 /// use std::convert::Infallible;
 /// use xecs::system::Errors;
 /// use std::cell::RefMut;
-/// struct ErrorHandler;
 ///
+/// struct ErrorHandler;
 /// impl<'a> System<'a> for ErrorHandler {
 ///     type InitResource = ();
 ///     type Resource = &'a mut Errors;
