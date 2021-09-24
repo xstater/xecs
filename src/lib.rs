@@ -34,17 +34,22 @@
 //! ```no_run
 //! # use xecs::{System, World};
 //! # use std::cell::RefMut;
+//! # use std::convert::Infallible;
 //! struct UpdatePosition;
 //! impl<'a> System<'a> for UpdatePosition {
+//!     type InitResource = ();
 //!     type Resource = (&'a mut World);
 //!     type Dependencies = ();
+//!     type Error = Infallible;
 //!
-//!     fn update(&'a mut self, world : RefMut<'a,World>) {
+//!
+//!     fn update(&'a mut self, world : RefMut<'a,World>) -> Result<(),Self::Error> {
 //!         for (pos,_tag) in world.query::<(&mut Position,&Particle)>() {
 //!             pos.0 += 1.1;
 //!             pos.1 += 1.2;
 //!             pos.3 += 1.4;
 //!         }
+//!         Ok(())
 //!     }
 //! }
 //! ```
@@ -69,6 +74,6 @@ pub mod resource;
 pub use entity::{ EntityId,Entities };
 pub use world::World;
 pub use components::Component;
-pub use system::System;
+pub use system::{System,Errors,End};
 pub use stage::Stage;
 

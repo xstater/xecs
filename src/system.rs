@@ -2,23 +2,35 @@
 use crate::stage::Stage;
 use std::any::{TypeId};
 use crate::resource::Resource;
+use std::error::Error;
+use std::collections::HashMap;
+use std::convert::Infallible;
 
 /// ## System trait
 /// * System can has it owm data like ```struct Event(u32)```
-/// * System can get other systems' data in Resource
+/// * System can get other systems' data through Resource
+/// * A System has many parameters ,the macro or default parameter feature may simplify this work.
 pub trait System<'a> : 'static{
+    /// Required data while system initializing
     type InitResource : Resource<'a>;
-    /// Required data while system running.
+    /// Required data while system running
     type Resource : Resource<'a>;
     /// The Dependencies of system
     type Dependencies : Dependencies;
+    /// the error type
+    type Error : Error + 'static;
     /// initialize the data
     #[allow(unused_variables)]
-    fn init(&'a mut self,resource : <Self::InitResource as Resource<'a>>::Type) {}
+    fn init(&'a mut self,resource : <Self::InitResource as Resource<'a>>::Type) -> Result<(),Self::Error>{
+        Ok(())
+    }
     /// update the states
     #[allow(unused_variables)]
-    fn update(&'a mut self,resource : <Self::Resource as Resource<'a>>::Type){}
+    fn update(&'a mut self,resource : <Self::Resource as Resource<'a>>::Type) -> Result<(),Self::Error>{
+        Ok(())
+    }
 }
+
 
 /// Something can be dependencies of systems
 pub trait Dependencies {
@@ -115,13 +127,17 @@ impl<T : for<'a> System<'a>> Run for T {
     fn initialize(&mut self, stage: &Stage) {
         //self has type Self:System
         let resource = <T as System>::InitResource::resource(stage);
-        self.init(resource);
+        if let Err(error) = self.init(resource) {
+            stage.system_data_mut::<Errors>().store_error::<T>(error);
+        }
     }
 
     fn run(&mut self, stage: &Stage) {
         //self has type Self:System
         let resource = <T as System>::Resource::resource(stage);
-        self.update(resource);
+        if let Err(error) = self.update(resource) {
+            stage.system_data_mut::<Errors>().store_error::<T>(error);
+        }
     }
 }
 
@@ -142,17 +158,21 @@ impl<'a> dyn 'static + Run {
 /// # use xecs::System;
 /// use xecs::resource::Resource;
 /// use xecs::system::End;
+/// use std::convert::Infallible;
 /// struct Clear;
 /// impl<'a> System<'a> for Clear {
+///     type InitResource = ();
 ///     type Resource = ();
 ///     type Dependencies = End;
+///     type Error = Infallible;
 ///
-///     fn init(&'a mut self, resource: <Self::Resource as Resource<'a>>::Type) {
+///
+///     fn init(&'a mut self, resource: <Self::Resource as Resource<'a>>::Type) -> Result<(),Self::Error>{
 ///         // initialize data
 ///         // or register components
 ///     }
 ///
-///     fn update(&'a mut self, resource: <Self::Resource as Resource<'a>>::Type) {
+///     fn update(&'a mut self, resource: <Self::Resource as Resource<'a>>::Type) -> Result<(),Self::Error> {
 ///         // DO STH WORK
 ///     }
 /// }
@@ -166,11 +186,85 @@ impl Dependencies for End {
     }
 }
 
+/// A special System that store the errors
+/// ## Examples
+/// ```no_run
+/// use xecs::System;
+/// use std::convert::Infallible;
+/// use xecs::system::Errors;
+/// use std::cell::RefMut;
+/// struct ErrorHandler;
+///
+/// impl<'a> System<'a> for ErrorHandler {
+///     type InitResource = ();
+///     type Resource = &'a mut Errors;
+///     type Dependencies = ErrorSource;
+///     type Error = Infallible;
+///
+///     fn update(&'a mut self,mut errors : RefMut<'a,Errors>) -> Result<(), Self::Error> {
+///         if let Some(error) = errors.fetch_error::<ErrorSource>() {
+///             println!("Catch error with value {}",error.as_ref().0);
+///         }
+///         Ok(())
+///     }
+/// }
+/// ```
+#[derive(Debug)]
+pub struct Errors {
+    errors : HashMap<TypeId,Option<Box<dyn Error>>>
+}
+
+impl<'a> System<'a> for Errors {
+    type InitResource = ();
+    type Resource = ();
+    type Dependencies = ();
+    type Error = Infallible;
+}
+
+impl Errors{
+    pub(in crate) fn new() -> Errors {
+        Errors {
+            errors: HashMap::new()
+        }
+    }
+
+    pub(in crate) fn register<S : for<'a> System<'a>>(&mut self) {
+        let tid = TypeId::of::<S>();
+        if !self.errors.contains_key(&tid) {
+            self.errors.insert(tid,Option::None);
+        }
+    }
+
+    pub(in crate) fn store_error<S>(&mut self,error : <S as System<'_>>::Error)
+        where S : for<'a> System<'a>{
+        let tid = TypeId::of::<S>();
+        debug_assert!(self.errors.contains_key(&tid),
+                      "Store error failed! No such system");
+        self.errors.get_mut(&tid).unwrap()
+            .replace(Box::new(error));
+    }
+
+    pub fn fetch_error<S : for<'a> System<'a>>(&mut self) -> Option<Box<<S as System<'_>>::Error>> {
+        let tid = TypeId::of::<S>();
+        debug_assert!(self.errors.contains_key(&tid),
+            "Fetch error failed! No such system");
+        self.errors.get_mut(&tid).unwrap()
+            .take()
+            .map(|error| {
+                // must success!
+                // because errors‘ Box<dyn Error> is S::Error !
+                error
+                    .downcast::<S::Error>()
+                    .unwrap()
+            })
+    }
+}
 
 #[cfg(test)]
 mod tests{
     use crate::system::{System, Dependencies};
     use std::any::TypeId;
+    use std::convert::Infallible;
 
     #[test]
     fn dependencies_trait_test() {
@@ -178,16 +272,19 @@ mod tests{
             type InitResource = ();
             type Resource = ();
             type Dependencies = ();
+            type Error = Infallible;
         }
         impl<'a> System<'a> for i32{
             type InitResource = ();
             type Resource = ();
             type Dependencies = ();
+            type Error = Infallible;
         }
         impl<'a> System<'a> for char{
             type InitResource = ();
             type Resource = ();
             type Dependencies = ();
+            type Error = Infallible;
         }
 
         assert_eq!(

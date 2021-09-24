@@ -1,6 +1,6 @@
 //! Stage struct
 use crate::World;
-use crate::system::{System, Run, Dependencies, End};
+use crate::system::{System, Run, Dependencies, End, Errors};
 use std::collections::HashMap;
 use std::any::{TypeId};
 use std::cell::{RefCell, Ref, RefMut};
@@ -11,7 +11,7 @@ struct SystemInfo {
     dependencies : Vec<TypeId>,
     is_active : bool,
     is_once : bool,
-    system : RefCell<Box<dyn Run>>
+    system : RefCell<Box<dyn Run>>,
 }
 
 /// Stage = World + Systems
@@ -36,24 +36,30 @@ impl Debug for Stage {
 impl Stage {
     /// Create a stage with a empty world.
     pub fn new() -> Stage {
-        Stage {
+        let mut stage = Stage {
             world: RefCell::new(World::new()),
             systems: HashMap::new(),
             need_update: false,
             run_queue: vec![],
             need_init: vec![]
-        }
+        };
+        stage.add_system(Errors::new());
+        stage.deactivate::<Errors>();
+        stage
     }
 
     /// Create a stage with determined world.
     pub fn from_world(world : World) -> Stage {
-        Stage {
+        let mut stage = Stage {
             world : RefCell::new(world),
             systems : HashMap::new(),
             need_update: false,
             run_queue: vec![],
             need_init: vec![]
-        }
+        };
+        stage.add_system(Errors::new());
+        stage.deactivate::<Errors>();
+        stage
     }
     /// Add a normal system in stage.
     pub fn add_system<T : for<'a> System<'a>>(&mut self,system : T) -> &mut Self{
@@ -65,9 +71,10 @@ impl Stage {
                 dependencies: <<T as System>::Dependencies as Dependencies>::dependencies(),
                 is_active: true,
                 is_once : false,
-                system : RefCell::new(Box::new(system))
+                system : RefCell::new(Box::new(system)),
             }
         );
+        self.system_data_mut::<Errors>().register::<T>();
         self
     }
 
@@ -82,9 +89,10 @@ impl Stage {
                 dependencies: <<T as System>::Dependencies as Dependencies>::dependencies(),
                 is_active: true,
                 is_once : true,
-                system: RefCell::new(Box::new(system))
+                system: RefCell::new(Box::new(system)),
             }
         );
+        self.system_data_mut::<Errors>().register::<T>();
         self
     }
 
@@ -271,8 +279,12 @@ impl Stage {
 mod tests{
     use crate::World;
     use crate::stage::Stage;
-    use crate::system::{System, End};
+    use crate::system::{System, End, Errors};
     use crate::resource::Resource;
+    use std::convert::Infallible;
+    use std::fmt::{Display, Formatter};
+    use std::error::Error;
+    use std::cell::RefMut;
 
     #[test]
     fn test_run() {
@@ -299,9 +311,11 @@ mod tests{
             type InitResource = ();
             type Resource = ();
             type Dependencies = ();
+            type Error = Infallible;
 
-            fn update(&'a mut self, _resource: <Self::Resource as Resource<'a>>::Type) {
+            fn update(&'a mut self, _resource: <Self::Resource as Resource<'a>>::Type) -> Result<(),Infallible>{
                 println!("Start");
+                Ok(())
             }
         }
 
@@ -309,12 +323,14 @@ mod tests{
             type InitResource = ();
             type Resource = (&'a World,&'a DataSystemName,&'a mut DataSystemAge);
             type Dependencies = StartSystem;
+            type Error = Infallible;
 
-            fn update(&mut self, (world,name,age) : <Self::Resource as Resource<'a>>::Type) {
+            fn update(&mut self, (world,name,age) : <Self::Resource as Resource<'a>>::Type) -> Result<(),Infallible> {
                 let v = world.query::<&char>().cloned().collect::<Vec<_>>();
                 dbg!(&v);
                 dbg!(&name.0);
                 dbg!(&age.0);
+                Ok(())
             }
         }
 
@@ -322,18 +338,22 @@ mod tests{
             type InitResource = ();
             type Resource = ();
             type Dependencies = StartSystem;
+            type Error = Infallible;
 
-            fn init(&'a mut self, _ : ()) {
+            fn init(&'a mut self, _ : ()) -> Result<(),Infallible> {
                 println!("DataSystemName has been added to stage");
+                Ok(())
             }
         }
         impl<'a> System<'a> for DataSystemAge {
             type InitResource = ();
             type Resource = ();
             type Dependencies = StartSystem;
+            type Error = Infallible;
 
-            fn init(&'a mut self, _ : ()) {
+            fn init(&'a mut self, _ : ()) -> Result<(),Infallible>{
                 println!("DataSystemAge has been added to stage");
+                Ok(())
             }
         }
 
@@ -341,18 +361,22 @@ mod tests{
             type InitResource = ();
             type Resource = ();
             type Dependencies = End;
+            type Error = Infallible;
 
-            fn update(&'a mut self, _resource: <Self::Resource as Resource<'a>>::Type) {
+            fn update(&'a mut self, _resource: <Self::Resource as Resource<'a>>::Type) -> Result<(),Infallible>{
                 println!("Finished");
+                Ok(())
             }
         }
         impl<'a> System<'a> for LastOfEnd {
             type InitResource = ();
             type Resource = ();
             type Dependencies = End;
+            type Error = Infallible;
 
-            fn update(&'a mut self, _resource: <Self::Resource as Resource<'a>>::Type) {
+            fn update(&'a mut self, _resource: <Self::Resource as Resource<'a>>::Type) -> Result<(),Infallible>{
                 println!("Finished!!!");
+                Ok(())
             }
         }
 
@@ -373,6 +397,57 @@ mod tests{
         stage.run();
 
         stage.activate::<PrintSystem>();
+        stage.run();
+    }
+
+    #[test]
+    fn error_test(){
+        let mut stage = Stage::new();
+
+        #[derive(Debug)]
+        struct MyError(i32);
+        impl Display for MyError {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                write!(f,"Error with value : {}",self.0)
+            }
+        }
+        impl Error for MyError{}
+
+        struct ErrorSource{
+            count : i32
+        }
+        impl<'a> System<'a> for ErrorSource {
+            type InitResource = ();
+            type Resource = ();
+            type Dependencies = ();
+            type Error = MyError;
+
+            fn update(&'a mut self, _resource: <Self::Resource as Resource<'a>>::Type) -> Result<(), Self::Error> {
+                let err = self.count;
+                self.count += 1;
+                Err(MyError(err))
+            }
+        }
+
+        struct ErrorHandler;
+        impl<'a> System<'a> for ErrorHandler {
+            type InitResource = ();
+            type Resource = &'a mut Errors;
+            type Dependencies = ErrorSource;
+            type Error = Infallible;
+
+            fn update(&'a mut self,mut errors : RefMut<'a,Errors>) -> Result<(), Self::Error> {
+                if let Some(error) = errors.fetch_error::<ErrorSource>() {
+                    println!("Catch error with value {}",error.as_ref().0);
+                }
+                Ok(())
+            }
+        }
+
+        stage.add_system(ErrorSource{count : 1})
+            .add_system(ErrorHandler);
+
+        stage.run();
         stage.run();
     }
 }
