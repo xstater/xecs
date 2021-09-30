@@ -216,6 +216,7 @@ impl Stage {
         }
     }
 
+    // update a run queue
     fn update(&mut self) {
         if !self.need_update {
             return;
@@ -233,7 +234,7 @@ impl Stage {
         for (self_type,self_system_info) in &self.systems {
             for dep_sys in &self_system_info.dependencies {
                 inverse_map.get_mut(dep_sys)
-                    .unwrap()
+                    .expect("Some dependencies have not been added to stage")
                     .push(*self_type)
             }
         }
@@ -284,7 +285,7 @@ mod tests{
     use std::convert::Infallible;
     use std::fmt::{Display, Formatter};
     use std::error::Error;
-    use std::cell::RefMut;
+    use std::cell::{Ref, RefMut};
 
     #[test]
     fn test_run() {
@@ -448,6 +449,41 @@ mod tests{
             .add_system(ErrorHandler);
 
         stage.run();
+        stage.run();
+    }
+
+    #[test]
+    fn init_test() {
+        let mut stage = Stage::new();
+
+        struct Data {
+            fuck : i32
+        }
+        impl<'a> System<'a> for Data {
+            type InitResource = ();
+            type Resource = ();
+            type Dependencies = ();
+            type Error = Infallible;
+        }
+
+        struct PrintDataInInit;
+        impl<'a> System<'a> for PrintDataInInit {
+            type InitResource = &'a Data;
+            type Resource = ();
+            type Dependencies = ();
+            type Error = Infallible;
+
+            fn init(&'a mut self, resource: <Self::InitResource as Resource<'a>>::Type) -> Result<(), Self::Error> {
+                let data: Ref<'a,Data> = resource;
+                println!("fuck u:{}",data.fuck);
+                Ok(())
+            }
+        }
+
+        stage.add_system(Data{
+            fuck : 3
+        }).add_system(PrintDataInInit);
+
         stage.run();
     }
 }
