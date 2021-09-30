@@ -33,7 +33,7 @@ pub trait System<'a> : 'static{
 
 
 /// Something can be dependencies of systems
-pub trait Dependencies {
+pub trait Dependencies : 'static {
     fn dependencies() -> Vec<TypeId>;
 }
 impl Dependencies for () {
@@ -141,7 +141,7 @@ impl<T : for<'a> System<'a>> Run for T {
     }
 }
 
-impl<'a> dyn 'static + Run {
+impl dyn 'static + Run {
     pub(in crate) unsafe fn downcast_ref<T : Run>(&self) -> &T {
         &*(self as *const dyn Run as *const T)
     }
