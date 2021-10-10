@@ -258,6 +258,13 @@ impl Errors{
                     .unwrap()
             })
     }
+
+    pub fn fetch_all_errors(&mut self) -> impl Iterator<Item = Box<dyn Error>> + '_{
+        self.errors.values_mut()
+            .filter_map(|error|{
+                error.take()
+            })
+    }
 }
 
 #[cfg(test)]

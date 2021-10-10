@@ -441,6 +441,9 @@ mod tests{
                 if let Some(error) = errors.fetch_error::<ErrorSource>() {
                     println!("Catch error with value {}",error.as_ref().0);
                 }
+                // for error in errors.fetch_all_errors() {
+                    // println!("{}",error);
+                // }
                 Ok(())
             }
         }
