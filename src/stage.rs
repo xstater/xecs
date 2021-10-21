@@ -183,6 +183,50 @@ impl Stage {
         self.world.borrow_mut()
     }
 
+    /// Dynamically add a dependency to the system
+    /// ### Panics
+    /// * Panic if the source system is not in stage
+    /// * Panic if the dependency system has already in source system
+    pub fn add_dependency<Src,Dep>(&mut self)
+        where Src : for<'a> System<'a>,
+              Dep : for<'a> System<'a> {
+        debug_assert!(self.has_system::<Src>(),
+            "Add dependency to system failed! The source system is not in stage");
+        let src_id = TypeId::of::<Src>();
+        let dep_id = TypeId::of::<Dep>();
+        let dependencies = &mut self.systems.get_mut(&src_id)
+            .unwrap()
+            .dependencies;
+        debug_assert!(!dependencies.contains(&dep_id),
+            "Add dependency to system failed! The dependency system has already in source system");
+        dependencies.push(dep_id)
+    }
+
+    /// Dynamically remove a dependency from system
+    /// ### Panics
+    /// * Panic if the source system is not in stage
+    /// * Panic if there is no dependency system in the source system
+    pub fn remove_dependency<Src,Dep>(&mut self)
+        where Src : for<'a> System<'a>,
+              Dep : for<'a> System<'a> {
+        debug_assert!(self.has_system::<Src>(),
+            "Remove dependency from system failed! The source system is not in stage");
+        let src_id = TypeId::of::<Src>();
+        let dep_id = TypeId::of::<Dep>();
+        let dependencies = &mut self.systems.get_mut(&src_id)
+            .unwrap()
+            .dependencies;
+        let index = dependencies.iter()
+            .enumerate()
+            .find(|(_,type_id)|{
+                **type_id == dep_id
+            }).map(|(index,_)|index);
+        debug_assert!(index.is_some(),
+            "Remove dependency from system failed! Cannot find dependency system");
+        let index = index.unwrap();
+        dependencies.remove(index);
+    }
+
     /// Execute all systems in stage.
     /// ### Details
     /// * Once Systems will be removed after ran.
@@ -396,9 +440,11 @@ mod tests{
         stage.deactivate::<PrintSystem>();
 
         stage.run();
+        stage.add_dependency::<DataSystemAge,DataSystemName>();
 
         stage.activate::<PrintSystem>();
         stage.run();
+        stage.remove_dependency::<DataSystemAge,DataSystemName>();
     }
 
     #[test]
