@@ -1,15 +1,15 @@
 //! # Component core trait
-use crate::sparse_set::SparseSet;
-use crate::EntityId;
+use crate::{entity::EntityId, sparse_set::SparseSet};
 
 /// Component is just a trait : Send + Sync + 'static.<br>
 /// XECS automatically impl this trait for all suitable structs
 pub trait Component : Send + Sync + 'static {}
 impl<T : Send + Sync + 'static> Component for T{}
 
-pub(in crate) trait ComponentStorage {
+pub trait ComponentStorage : Send + Sync{
     fn has(&self,entity_id : EntityId) -> bool;
     fn index(&self,entity_id : EntityId) -> Option<usize>;
+    fn id(&self,index : usize) -> Option<EntityId>;
     fn remove(&mut self,entity_id : EntityId);
     fn swap_by_index(&mut self,index_a : usize,index_b : usize);
     fn count(&self) -> usize;
@@ -25,6 +25,10 @@ impl<T : Component> ComponentStorage for SparseSet<EntityId,T>{
 
     fn index(&self, entity_id: EntityId) -> Option<usize> {
         self.get_index(entity_id)
+    }
+
+    fn id(&self, index : usize) -> Option<EntityId> {
+        self.entities().get(index).cloned()
     }
 
     fn remove(&mut self, entity_id: EntityId) {
