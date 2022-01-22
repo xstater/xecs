@@ -1,7 +1,9 @@
 //! # Some structs for Entity
+use std::any::TypeId;
 use std::num::NonZeroUsize;
-use crate::{World, Component};
-use std::cell::{Ref, RefMut};
+use crate::component::Component;
+use crate::sparse_set::SparseSet;
+use crate::world::World;
 
 /// An ID of entity ,starting at 1 ,can be re-used
 pub type EntityId = NonZeroUsize;
@@ -12,14 +14,14 @@ pub type Entities = [EntityId];
 #[derive(Debug)]
 pub struct EntityRef<'a>{
     world : &'a mut World,
-    id : EntityId
+    id : EntityId,
 }
 
 impl<'a> EntityRef<'a>{
     pub(in crate) fn new(world : &'a mut World,entity_id : EntityId) -> EntityRef<'a>{
         EntityRef{
             world,
-            id: entity_id
+            id: entity_id,
         }
     }
 
@@ -40,18 +42,60 @@ impl<'a> EntityRef<'a>{
         self
     }
 
-    /// Get a reference of this entity's component
-    pub fn component_ref<T : Component>(&'a self) -> Ref<'a,T>{
-        // unwrap here
-        // because id must be a valid ID
-        self.world.entity_component_ref(self.id).unwrap()
+    /// Manipulate component of current entity
+    /// # Panics
+    /// Panic if component was not registered
+    pub fn with_component<T,F>(self,mut f : F) -> EntityRef<'a>
+    where T : Component,
+          F : FnMut(&T) {
+        assert!(self.world.has_registered::<T>(),
+                "EntityRef: Component was not registered in world");
+        {
+            // unwrap here:
+            // assert before ensure this
+            let type_id = TypeId::of::<T>();
+            let storage = self.world.storage_ref(type_id).unwrap();
+            // SAFTY:
+            // Safe here because the raw type of Box<dyn ...> is SparseSet<EntityId,T>
+            let sparse_set = unsafe {
+                storage.downcast_ref::<SparseSet<EntityId,T>>()
+            };
+            // SAFTY:
+            // Safe here because id was valid when EntityRef was alive
+            let component = unsafe {
+                sparse_set.get_unchecked(self.id)
+            };
+            f(component);
+        }
+        self
     }
 
-    /// Get a mutable reference of this entity's component
-    pub fn component_mut<T : Component>(&'a self) -> RefMut<'a,T>{
-        // unwrap here
-        // because id must be a valid ID
-        self.world.entity_component_mut(self.id).unwrap()
+    /// Manipulate component of current entity
+    /// # Panics
+    /// Panic if component was not registered
+    pub fn with_component_mut<T,F>(self,mut f : F) -> EntityRef<'a>
+    where T : Component,
+          F : FnMut(&mut T) {
+        assert!(self.world.has_registered::<T>(),
+                "EntityRef: Component was not registered in world");
+        {
+            // unwrap here:
+            // assert before ensure this
+            let type_id = TypeId::of::<T>();
+            let mut storage = self.world.storage_mut(type_id).unwrap();
+            // SAFTY:
+            // Safe here because the raw type of Box<dyn ...> is SparseSet<EntityId,T>
+            let sparse_set = unsafe {
+                storage.downcast_mut::<SparseSet<EntityId,T>>()
+            };
+            // SAFTY:
+            // Safe here because id was valid when EntityRef was alive
+            let component = unsafe {
+                sparse_set.get_unchecked_mut(self.id)
+            };
+            f(component);
+        }
+        self
     }
 }
 
@@ -104,6 +148,8 @@ impl EntityManager {
         }
     }
 
+    // remove an entity id
+    // Do nothing if entity_id is not existence
     pub(in crate) fn remove(&mut self,entity_id : EntityId) {
         let entity_id_ = entity_id.get();
         if let EntityFlag::Unavailable(index) = self.entity_flags[entity_id_] {
@@ -115,8 +161,6 @@ impl EntityManager {
             // keep this destroyed id be a chain
             self.entity_flags[entity_id_] = self.entity_flags[0];
             self.entity_flags[0] = EntityFlag::Available(entity_id);
-        } else {
-            panic!("Entity is not existence");
         }
     }
 
@@ -140,8 +184,7 @@ impl EntityManager {
 
 #[cfg(test)]
 mod tests{
-    use crate::entity::EntityManager;
-    use crate::EntityId;
+    use crate::entity::{EntityId, EntityManager};
 
     #[test]
     fn manager_test() {

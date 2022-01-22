@@ -33,15 +33,19 @@ world.make_group::<(Particle,Position)>(true,true);
 ```rust
 struct UpdatePosition;
 impl<'a> System<'a> for UpdatePosition {
+    type InitResource = ();
     type Resource = (&'a mut World);
     type Dependencies = ();
+    type Error = Infallible;
 
-    fn update(&'a mut self, world : RefMut<'a,World>) {
+
+    fn update(&'a mut self, world : RefMut<'a,World>) -> Result<(),Self::Error> {
         for (pos,_tag) in world.query::<(&mut Position,&Particle)>() {
             pos.0 += 1.1;
             pos.1 += 1.2;
             pos.3 += 1.4;
         }
+        Ok(())
     }
 }
 ```
