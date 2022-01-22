@@ -65,8 +65,8 @@ impl<A : Component,B : Component> Group for NonOwning<A,B> {
             return;
         }
 
-        // get index in components storage
-        // This unwrap never fails because the in_components() ensure it's already in components
+        // get index in component storage
+        // This unwrap never fails because the in_components() ensures that it's already in components.
         let index_a = comp_a.index(id).unwrap();
         let index_b = comp_b.index(id).unwrap();
 
@@ -82,7 +82,7 @@ impl<A : Component,B : Component> Group for NonOwning<A,B> {
         }
 
         // Unwrap here
-        // This never fails because in_group ensure it's in group
+        // This never fails because in_group ensures that it's already in group.
         self.sparse_set.remove(id).unwrap();
     }
 
@@ -98,7 +98,7 @@ impl<A : Component,B : Component> Group for NonOwning<A,B> {
         if len_a < len_b {
             for index_a in 0..len_a {
                 // Unwrap here never fails
-                // the for loop ensure this
+                // the for loop ensures this
                 let entity_id = comp_a.id(index_a).unwrap();
                 if let Some(index_b) = comp_b.index(entity_id) {
                     self.sparse_set.add(entity_id,(index_a,index_b));
@@ -107,7 +107,7 @@ impl<A : Component,B : Component> Group for NonOwning<A,B> {
         } else {
             for index_b in 0..len_b {
                 // Unwrap here never fails
-                // the for loop ensure this
+                // the for loop ensures this
                 let entity_id = comp_b.id(index_b).unwrap();
                 if let Some(index_a) = comp_a.index(entity_id) {
                     self.sparse_set.add(entity_id,(index_a,index_b));

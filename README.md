@@ -15,7 +15,7 @@ struct Particle;
 world.register::<Position>();
 world.register::<Particle>();
 ```
-### Create 100 entity with Position and Particle components
+### Create 100 entities with Position and Particle components
 ```rust
 for _ in 0..100 {
     world
@@ -29,7 +29,7 @@ for _ in 0..100 {
 ```rust
 world.make_group::<(Particle,Position)>(true,true);
 ```
-### Create a system and update all entities with position and particle components
+### Create a system and update all entities with Position and Particle components
 ```rust
 struct UpdatePosition;
 impl<'a> System<'a> for UpdatePosition {

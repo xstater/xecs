@@ -39,7 +39,7 @@ impl<E,T> SparseSet<E,T>
             //overwrite
             self.data[index.get() - 1] = data;
         }else{
-            //have not yet
+            //not yet exist
             self.indices[entity_] = NonZeroUsize::new(self.entities.len() + 1);
             self.entities.push(entity);
             self.data.push(data);

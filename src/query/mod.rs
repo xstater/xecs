@@ -80,7 +80,7 @@ impl<'a,T : Component> Iterator for IterRef<'a,T> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.borrow.count() {
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set = unsafe { &*self.sparse_set };
@@ -107,7 +107,7 @@ impl<'a,T : Component> QueryIterator for IterRef<'a,T> {
 
     fn from_id(&mut self,id : EntityId) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because self.sparse_set is 
+        // Safe here, because self.sparse_set is 
         // a pointer from borrow:Ref<'a,SparseSet<...>>,
         // This pointer is valid now.
         let sparse_set = unsafe { &*self.sparse_set };
@@ -117,7 +117,7 @@ impl<'a,T : Component> QueryIterator for IterRef<'a,T> {
     fn next_with_id(&mut self) -> Option<(EntityId,Self::Item)> {
         if self.index < self.borrow.count() {
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set = unsafe { &*self.sparse_set };
@@ -179,7 +179,7 @@ impl<'a,T : Component> Iterator for IterMut<'a,T> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.borrow.count() {
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set = unsafe { &mut *self.sparse_set };
@@ -206,7 +206,7 @@ impl<'a,T : Component> QueryIterator for IterMut<'a,T> {
 
     fn from_id(&mut self,id : EntityId) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because self.sparse_set is 
+        // Safe here, because self.sparse_set is 
         // a pointer from borrow:Ref<'a,SparseSet<...>>,
         // This pointer is valid now.
         let sparse_set = unsafe { &mut *self.sparse_set };
@@ -216,7 +216,7 @@ impl<'a,T : Component> QueryIterator for IterMut<'a,T> {
     fn next_with_id(&mut self) -> Option<(EntityId,Self::Item)> {
         if self.index < self.borrow.count() {
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set = unsafe { &mut *self.sparse_set };
@@ -340,7 +340,7 @@ mod tests{
         let res = world.query::<(&u32,Without<&char>)>()
             .map(|a|*a)
             .collect::<Vec<_>>();
-        assert_eq!(&res,&[1,3,7]);
+        assert_eq!(&res,& [1,3,7]);
 
         let res = world.query::<(Without<(&char,&Tag)>,&u32)>()
             .map(|b|*b)

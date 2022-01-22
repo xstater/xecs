@@ -32,7 +32,7 @@ pub trait Group : Send + Sync{
             .expect("Group: Component was not registered in world")
     }
 
-    /// Check an entity existing in two components storage
+    /// Check if entity exist in both component storages
     fn in_components(&self,
                      id : EntityId,
                      comp_a : &Box<dyn ComponentStorage>,
@@ -40,7 +40,7 @@ pub trait Group : Send + Sync{
         comp_a.has(id) && comp_b.has(id)
     }
 
-    /// Check an entity existing in group
+    /// Check if entity exist in group
     fn in_group(&self,
                 id : EntityId,
                 comp_a : &Box<dyn ComponentStorage>,
