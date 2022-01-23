@@ -154,7 +154,7 @@ impl World {
     }
 
     /// Check if ```entity_id``` exists in World.
-    pub fn exist(&mut self, entity_id: EntityId) -> bool {
+    pub fn exist(&self, entity_id: EntityId) -> bool {
         self.entity_manager.has(entity_id)
     }
 
