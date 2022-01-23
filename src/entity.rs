@@ -1,14 +1,22 @@
-//! # Some structs for Entity
+//! # About entity
+//! Entity in XECS is just an number ID.In XECS, it's just a 
+//! [NonZeroUsize](std::num::NonZeroUsize).
+//! The ID is allocated from 1 by world automatically. The ```id=0``` 
+//! represents a recycled ID without any other flags through ```Option<EntityId>```.
+//! # ID recycling
+//! When you call ```world.create_entity()```, an ID will be allocated automatically. 
+//! If you call ```world.remove_entity(id)```, this ID will be a pit. If the 
+//! next ```world.create_entity()``` is called, it will allocate this ID to fill 
+//! the pit.Thanks to [sparse set](crate::sparse_set), it's still fast to 
+//! iterate all components no matter how random of ID
 use std::any::TypeId;
 use std::num::NonZeroUsize;
 use crate::component::Component;
 use crate::sparse_set::SparseSet;
 use crate::world::World;
 
-/// An ID of entity, starting at 1, can be re-used
+/// The type of ID of entity which starts from 1 and can be recycled automatically
 pub type EntityId = NonZeroUsize;
-/// A slice of EntityId
-pub type Entities = [EntityId];
 
 /// A useful struct for manipulating a entity
 #[derive(Debug)]

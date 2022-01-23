@@ -1,4 +1,9 @@
-//! # world struct
+//! ## Concurrency Safety
+//! Because [Component](crate::component::Component) is just ```T : Send + Sync```.
+//! [World](crate::world::World) can use [RwLock](std::sync::RwLock) to 
+//! ensure the borrow check relations of all components.And [World](crate::world::World) can also
+//! be ```Send + Sync```.Therefore,the all other states of world can be guarded
+//! by [RwLock](std::sync::RwLock).So we can use world in concurrency environment by ```RwLock<World>```.
 use crate::component::{Component, ComponentStorage};
 use crate::entity::{EntityId, EntityManager, EntityRef};
 use crate::group::Group;
@@ -9,8 +14,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-/// World is the core struct of XECS. It manages all the entities and components. Using RefCell to ensure the
-/// borrowing relations.
+/// World is the core of XECS.It manages all components and entities
 pub struct World {
     entity_manager: EntityManager,
     // Box<SparseSet<EntityId,Component>>
@@ -48,7 +52,8 @@ impl World {
         self.components.contains_key(&type_id)
     }
 
-    /// Create an empty entity in World, return an EntityRef.
+    /// Create an entity without any component in World,
+    ///  return an [EntityRef](crate::entity::EntityRef).
     pub fn create_entity(&mut self) -> EntityRef<'_> {
         let id = self.entity_manager.create();
         EntityRef::new(self, id)
@@ -93,8 +98,8 @@ impl World {
 
     /// Attach a component to an entity.  
     /// # Panics
-    /// * Panic if T is not registered.
-    /// * Panic if entity_id not exist.
+    /// * Panic if ```T``` is not registered.
+    /// * Panic if ```entity_id``` not exist.
     pub fn attach_component<T: Component>(&mut self, entity_id: EntityId,component: T) {
         assert!(self.has_registered::<T>(),
                 "World:Cannot attach component because components has not been registered.");
@@ -121,11 +126,11 @@ impl World {
 
     /// Detach a component from an entity.
     /// # Details
-    /// Return None if entity doesn't have this component,  
-    /// otherwise return Some(component)
+    /// Return ```None``` if entity doesn't have this component,  
+    /// otherwise return ```Some(component)```
     /// # Panics
-    /// * Panic if T is not registered.
-    /// * Panic if entity_id not exist.
+    /// * Panic if ```T``` is not registered.
+    /// * Panic if ```entity_id``` not exist.
     pub fn detach_component<T: Component>(&mut self, entity_id: EntityId) -> Option<T> {
         assert!(self.has_registered::<T>(),
                 "World:Cannot detach component because components has not been registered.");
@@ -148,12 +153,13 @@ impl World {
         sparse_set.remove(entity_id)
     }
 
-    /// Check if id exists in World.
+    /// Check if ```entity_id``` exists in World.
     pub fn exist(&mut self, entity_id: EntityId) -> bool {
         self.entity_manager.has(entity_id)
     }
 
-    /// Get EntityRef from an EntityId, return None if id not exist in World.
+    /// Get an [EntityRef](crate::entity::EntityRef) from the ```entity_id```, 
+    /// return ```None``` if ```entity_id``` not exists in World.
     pub fn entity(&mut self, entity_id: EntityId) -> Option<EntityRef<'_>> {
         if self.exist(entity_id) {
             Some(EntityRef::new(self, entity_id))
@@ -167,11 +173,9 @@ impl World {
         self.entity_manager.entities()
     }
 
-    /// Make a group to accelerate the iteration.
-    /// ## Details
-    /// See [group](crate::group)
+    /// Make a [group](crate::group) to accelerate the iteration.
     /// ## Panics
-    /// * Panic if group is the same as another group in World.
+    /// * Panic if ```group``` is the same as another group in [World](crate::world::World).
     /// * Panic if component is owned by another group.
     pub fn make_group<G: Group + 'static>(&mut self, group: G) {
         assert!(!self.has_group(&group),
@@ -200,8 +204,8 @@ impl World {
         self.groups.push(RwLock::new(Box::new(group)));
     }
 
-    /// Check if group exist in World.
-    /// Return true if group is the same as another group in World.
+    /// Check if (group)[crate::group] exists in [World](crate::world::World).
+    /// Return true if group is same as another group in World.
     pub fn has_group<G: Group + 'static>(&self, group: &G) -> bool {
         for world_group in &self.groups {
             let world_group = world_group.read().unwrap();
@@ -231,9 +235,7 @@ impl World {
             .unwrap()
     }
 
-    /// Query entities
-    /// ## Details
-    /// See [query](crate::query)
+    /// [Query](crate::query) entities with conditions
     pub fn query<'a, T: Queryable<'a>>(
         &'a self,
     ) -> Box<dyn QueryIterator<Item = <T as Queryable>::Item> + 'a> {

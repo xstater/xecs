@@ -1,3 +1,31 @@
+//! # Queryable
+//! [Queryable](crate::query::Queryable) is trait that somethings can be queried in world. 
+//! ```&T``` or ```&mut T``` where ```T : Component``` and ```T``` is registered 
+//! in world can simply be [Queryable](crate::query::Queryable). The tuple of combination of them 
+//! like ```(&A,&mut B)``` is also [Queryable](crate::query::Queryable).
+//! # QueryIterator
+//! The result of [query](crate::world::World::query) is a boxed [QueryIterator](crate::query::QueryIterator). 
+//! This trait is an extension of [Iterator](std::iter::Iterator). So it can be treat as 
+//! an [Iterator](std::iter::Iterator).
+//! # With Id
+//! Sometime we don't only need the borrow of components data, but we also interest in the ID of
+//! entity. The [with_id](crate::query::WithId::with_id) method from [WithId](crate::query::WithId) 
+//! will be helpful.
+//! ```no_run
+//! // query with id
+//! use xecs::query::WithId; // we need use this trait before using with_id
+//! for (id,data) in world.query::<&A>().with_id() {
+//!     // do sth with id and data
+//! }
+//! ```
+//! # Without
+//! Sometime we want to query all entities with component ```A``` but ```B```.The
+//! [Without](crate::query::Without) can be useful in this situation.
+//! ```no_run
+//! for data in world.query::<(&A,Without<&B>)>() {
+//!    // do sth with data
+//! }
+//! ```
 use std::{any::TypeId, sync::{RwLockReadGuard, RwLockWriteGuard}};
 use crate::{component::{Component, ComponentStorage}, entity::EntityId, sparse_set::SparseSet, world::World};
 
@@ -17,14 +45,19 @@ pub use without::{
     WithoutIterRight
 };
 
+/// Some thing can be queried
 pub trait Queryable<'a> {
     type Item;
 
+    /// Get the [QueryIterator](crate::query::QueryIterator) from the world
     fn query(world : &'a World) -> Box<(dyn QueryIterator<Item = Self::Item> + 'a)>;
 }
 
+/// The result of query
 pub trait QueryIterator : Iterator {
+    /// Get item from ```id```
     fn from_id(&mut self,id : EntityId) -> Option<Self::Item>;
+    /// Just like [next](std::iter::Iterator::next), but it yield data with ID
     fn next_with_id(&mut self) -> Option<(EntityId,Self::Item)>;
 }
 
@@ -245,9 +278,13 @@ pub struct IdIter<A> {
     iter : A
 }
 
+/// A trait for [with_id](crate::query::WithId::with_id) method
 pub trait WithId {
     type Inner;
 
+    /// Get a new [Iterator](std::iter::Iterator) that calls
+    /// [next_with_id](crate::query::QueryIterator::next_with_id) in
+    /// [next](std::iter::Iterator::next) method.
     fn with_id(self) -> IdIter<Self::Inner>;
 }
 
