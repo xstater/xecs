@@ -46,8 +46,8 @@ impl<A : Component,B : Component> Group for PartialOwning<A,B> {
             return false;
         }
 
-        // get index in components storage
-        // This unwrap never failed because the in_components() ensure it's already in components
+        // get index in component storage
+        // This unwrap never failed because the in_components() ensures that it's already in components
         let index_a = comp_a.index(id).unwrap();
 
         if index_a < self.length {

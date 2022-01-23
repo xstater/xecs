@@ -64,7 +64,7 @@ impl<'a,A: Component,B : Component> Iterator for IterRefRef<'a,A,B> {
 
     fn next(&mut self) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because self.group is 
+        // Safe here, because self.group is 
         // a pointer from borrow,
         // This pointer is valid now.
         let group = unsafe { &*self.sparse_set_group };
@@ -75,13 +75,13 @@ impl<'a,A: Component,B : Component> Iterator for IterRefRef<'a,A,B> {
                 group.data().get_unchecked(self.index)
             };
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &*self.sparse_set_a };
             let sparse_set_b = unsafe { &*self.sparse_set_b };
             // Safety:
-            // Safe here, because index stored in group is valid.
+            // Safe here, because the index stored in group is valid.
             let data_a = unsafe {
                 sparse_set_a.data().get_unchecked(*index_a)
             };
@@ -106,7 +106,7 @@ impl<'a,A : Component,B : Component> ExactSizeIterator for IterRefRef<'a,A,B>{ }
 impl<'a,A : Component,B : Component> QueryIterator for IterRefRef<'a,A,B> {
     fn from_id(&mut self, id : EntityId) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because these are
+        // Safe here, because these are
         // pointers from borrow,
         // This pointer is valid now.
         let group = unsafe { &*self.sparse_set_group };
@@ -114,7 +114,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterRefRef<'a,A,B> {
         let sparse_set_b = unsafe { &*self.sparse_set_b };
         if let Some((index_a,index_b)) = group.get(id) {
             // Safety:
-            // Safe here, because index stored in group is valid.
+            // Safe here, because the index stored in group is valid.
             let data_a = unsafe {
                 sparse_set_a.data().get_unchecked(*index_a)
             };
@@ -129,13 +129,13 @@ impl<'a,A : Component,B : Component> QueryIterator for IterRefRef<'a,A,B> {
 
     fn next_with_id(&mut self) -> Option<(EntityId,Self::Item)> {
         // Safety:
-        // Safe here,because self.group is 
+        // Safe here, because self.group is 
         // a pointer from borrow,
         // This pointer is valid now.
         let group = unsafe { &*self.sparse_set_group };
         if self.index < group.len() {
             // Safety:
-            // Safe here, because if condition ensure this
+            // Safe here, because if condition ensures this.
             let id = *unsafe {
                 group.entities().get_unchecked(self.index)
             };
@@ -143,13 +143,13 @@ impl<'a,A : Component,B : Component> QueryIterator for IterRefRef<'a,A,B> {
                 group.data().get_unchecked(self.index)
             };
             // Safety:
-            // Safe here,because these are
+            // Safe here, because these are
             // pointers from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &*self.sparse_set_a };
             let sparse_set_b = unsafe { &*self.sparse_set_b };
             // Safety:
-            // Safe here, because index stored in group is valid.
+            // Safe here, because the index stored in group is valid.
             let data_a = unsafe {
                 sparse_set_a.data().get_unchecked(*index_a)
             };
@@ -231,7 +231,7 @@ impl<'a,A: Component,B : Component> Iterator for IterRefMut<'a,A,B> {
 
     fn next(&mut self) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because self.group is 
+        // Safe here, because self.group is 
         // a pointer from borrow,
         // This pointer is valid now.
         let group = unsafe { &*self.sparse_set_group };
@@ -242,13 +242,13 @@ impl<'a,A: Component,B : Component> Iterator for IterRefMut<'a,A,B> {
                 group.data().get_unchecked(self.index)
             };
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &*self.sparse_set_a };
             let sparse_set_b = unsafe { &mut *self.sparse_set_b };
             // Safety:
-            // Safe here, because index stored in group is valid.
+            // Safe here, because the index stored in group is valid.
             let data_a = unsafe {
                 sparse_set_a.data().get_unchecked(*index_a)
             };
@@ -273,7 +273,7 @@ impl<'a,A : Component,B : Component> ExactSizeIterator for IterRefMut<'a,A,B>{ }
 impl<'a,A : Component,B : Component> QueryIterator for IterRefMut<'a,A,B> {
     fn from_id(&mut self, id : EntityId) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because these are
+        // Safe here, because these are
         // pointers from borrow,
         // This pointer is valid now.
         let group = unsafe { &*self.sparse_set_group };
@@ -296,13 +296,13 @@ impl<'a,A : Component,B : Component> QueryIterator for IterRefMut<'a,A,B> {
 
     fn next_with_id(&mut self) -> Option<(EntityId,Self::Item)> {
         // Safety:
-        // Safe here,because self.group is 
+        // Safe here, because self.group is 
         // a pointer from borrow,
         // This pointer is valid now.
         let group = unsafe { &*self.sparse_set_group };
         if self.index < group.len() {
             // Safety:
-            // Safe here, because if condition ensure this
+            // Safe here, because if condition ensures this.
             let id = *unsafe {
                 group.entities().get_unchecked(self.index)
             };
@@ -310,13 +310,13 @@ impl<'a,A : Component,B : Component> QueryIterator for IterRefMut<'a,A,B> {
                 group.data().get_unchecked(self.index)
             };
             // Safety:
-            // Safe here,because these are
+            // Safe here, because these are
             // pointers from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &*self.sparse_set_a };
             let sparse_set_b = unsafe { &mut *self.sparse_set_b };
             // Safety:
-            // Safe here, because index stored in group is valid.
+            // Safe here, because the index stored in group is valid.
             let data_a = unsafe {
                 sparse_set_a.data().get_unchecked(*index_a)
             };
@@ -398,7 +398,7 @@ impl<'a,A: Component,B : Component> Iterator for IterMutRef<'a,A,B> {
 
     fn next(&mut self) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because self.group is 
+        // Safe here, because self.group is 
         // a pointer from borrow,
         // This pointer is valid now.
         let group = unsafe { &*self.sparse_set_group };
@@ -409,13 +409,13 @@ impl<'a,A: Component,B : Component> Iterator for IterMutRef<'a,A,B> {
                 group.data().get_unchecked(self.index)
             };
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &mut *self.sparse_set_a };
             let sparse_set_b = unsafe { &*self.sparse_set_b };
             // Safety:
-            // Safe here, because index stored in group is valid.
+            // Safe here, because the index stored in group is valid.
             let data_a = unsafe {
                 sparse_set_a.data_mut().get_unchecked_mut(*index_a)
             };
@@ -440,7 +440,7 @@ impl<'a,A : Component,B : Component> ExactSizeIterator for IterMutRef<'a,A,B>{ }
 impl<'a,A : Component,B : Component> QueryIterator for IterMutRef<'a,A,B> {
     fn from_id(&mut self, id : EntityId) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because these are
+        // Safe here, because these are
         // pointers from borrow,
         // This pointer is valid now.
         let group = unsafe { &*self.sparse_set_group };
@@ -448,7 +448,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutRef<'a,A,B> {
         let sparse_set_b = unsafe { &*self.sparse_set_b };
         if let Some((index_a,index_b)) = group.get(id) {
             // Safety:
-            // Safe here, because index stored in group is valid.
+            // Safe here, because the index stored in group is valid.
             let data_a = unsafe {
                 sparse_set_a.data_mut().get_unchecked_mut(*index_a)
             };
@@ -463,7 +463,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutRef<'a,A,B> {
 
     fn next_with_id(&mut self) -> Option<(EntityId,Self::Item)> {
         // Safety:
-        // Safe here,because self.group is 
+        // Safe here, because self.group is 
         // a pointer from borrow,
         // This pointer is valid now.
         let group = unsafe { &*self.sparse_set_group };
@@ -477,13 +477,13 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutRef<'a,A,B> {
                 group.data().get_unchecked(self.index)
             };
             // Safety:
-            // Safe here,because these are
+            // Safe here, because these are
             // pointers from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &mut *self.sparse_set_a };
             let sparse_set_b = unsafe { &*self.sparse_set_b };
             // Safety:
-            // Safe here, because index stored in group is valid.
+            // Safe here, because the index stored in group is valid.
             let data_a = unsafe {
                 sparse_set_a.data_mut().get_unchecked_mut(*index_a)
             };
@@ -566,7 +566,7 @@ impl<'a,A: Component,B : Component> Iterator for IterMutMut<'a,A,B> {
 
     fn next(&mut self) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because self.group is 
+        // Safe here, because self.group is 
         // a pointer from borrow,
         // This pointer is valid now.
         let group = unsafe { &*self.sparse_set_group };
@@ -577,13 +577,13 @@ impl<'a,A: Component,B : Component> Iterator for IterMutMut<'a,A,B> {
                 group.data().get_unchecked(self.index)
             };
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &mut *self.sparse_set_a };
             let sparse_set_b = unsafe { &mut *self.sparse_set_b };
             // Safety:
-            // Safe here, because index stored in group is valid.
+            // Safe here, because the index stored in group is valid.
             let data_a = unsafe {
                 sparse_set_a.data_mut().get_unchecked_mut(*index_a)
             };
@@ -608,7 +608,7 @@ impl<'a,A : Component,B : Component> ExactSizeIterator for IterMutMut<'a,A,B>{ }
 impl<'a,A : Component,B : Component> QueryIterator for IterMutMut<'a,A,B> {
     fn from_id(&mut self, id : EntityId) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because these are
+        // Safe here, because these are
         // pointers from borrow,
         // This pointer is valid now.
         let group = unsafe { &*self.sparse_set_group };
@@ -616,7 +616,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutMut<'a,A,B> {
         let sparse_set_b = unsafe { &mut *self.sparse_set_b };
         if let Some((index_a,index_b)) = group.get(id) {
             // Safety:
-            // Safe here, because index stored in group is valid.
+            // Safe here, because the index stored in group is valid.
             let data_a = unsafe {
                 sparse_set_a.data_mut().get_unchecked_mut(*index_a)
             };
@@ -631,7 +631,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutMut<'a,A,B> {
 
     fn next_with_id(&mut self) -> Option<(EntityId,Self::Item)> {
         // Safety:
-        // Safe here,because self.group is 
+        // Safe here, because self.group is 
         // a pointer from borrow,
         // This pointer is valid now.
         let group = unsafe { &*self.sparse_set_group };
@@ -645,13 +645,13 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutMut<'a,A,B> {
                 group.data().get_unchecked(self.index)
             };
             // Safety:
-            // Safe here,because these are
+            // Safe here, because these are
             // pointers from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &mut *self.sparse_set_a };
             let sparse_set_b = unsafe { &mut *self.sparse_set_b };
             // Safety:
-            // Safe here, because index stored in group is valid.
+            // Safe here, because the index stored in group is valid.
             let data_a = unsafe {
                 sparse_set_a.data_mut().get_unchecked_mut(*index_a)
             };

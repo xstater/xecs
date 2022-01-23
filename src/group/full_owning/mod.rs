@@ -52,8 +52,8 @@ impl<A : Component,B : Component> Group for FullOwning<A,B> {
             return false;
         }
 
-        // get index in two components storage
-        // This unwrap never fails because the in_components() ensure it's already in components
+        // get indexes in both component storages
+        // This unwrap never fails because the in_components() ensures that it's already in components
         let index_a = comp_a.index(id).unwrap();
         let index_b = comp_b.index(id).unwrap();
         if index_a < self.length && index_b < self.length {
@@ -74,8 +74,8 @@ impl<A : Component,B : Component> Group for FullOwning<A,B> {
             return;
         }
         
-        // get index in two components storage
-        // This unwrap never fails because the in_components() ensure it's already in components
+        // get indexes in both component storages
+        // This unwrap never fails because the in_components() ensures that it's already in components
         let index_a = comp_a.index(id).unwrap();
         let index_b = comp_b.index(id).unwrap();
 
@@ -93,8 +93,8 @@ impl<A : Component,B : Component> Group for FullOwning<A,B> {
             return;
         }
 
-        // get index in two components storage
-        // This unwrap never fails because the in_group() ensure it's already in components
+        // get indexes in both component storages
+        // This unwrap never fails because the in_group() ensure that it's already in components
         let index_a = comp_a.index(id).unwrap();
         let index_b = comp_b.index(id).unwrap();
 

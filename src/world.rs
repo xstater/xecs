@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-/// World is core struct of xecs.It manages all entities and components.Using RefCell to ensure the
-/// borrow relations.
+/// World is the core struct of XECS. It manages all the entities and components. Using RefCell to ensure the
+/// borrowing relations.
 pub struct World {
     entity_manager: EntityManager,
     // Box<SparseSet<EntityId,Component>>
@@ -30,7 +30,7 @@ impl World {
 
     /// Register a component.
     /// # Panics
-    /// Panic if component has been registered.
+    /// Panic if component is registered.
     pub fn register<T: Component>(&mut self) -> &mut Self {
         assert!(!self.has_registered::<T>(),
                 "World:Cannot register a component twice");
@@ -42,19 +42,19 @@ impl World {
         self
     }
 
-    /// Check if a component has been registered
+    /// Check if component is registered.
     pub fn has_registered<T: Component>(&self) -> bool {
         let type_id = TypeId::of::<T>();
         self.components.contains_key(&type_id)
     }
 
-    /// Create an empty entity in world, return an EntityRef.
+    /// Create an empty entity in World, return an EntityRef.
     pub fn create_entity(&mut self) -> EntityRef<'_> {
         let id = self.entity_manager.create();
         EntityRef::new(self, id)
     }
 
-    /// Remove an entity and its components.
+    /// Remove entity and its components.
     pub fn remove_entity(&mut self, entity_id: EntityId) {
         assert!(self.exist(entity_id),
                 "World:Cannot remove a non-exists entity");
@@ -73,8 +73,8 @@ impl World {
         }
     }
 
-    /// Get lock guard of raw component storage
-    /// return None if component was not registered
+    /// Get lock guard of raw component storage,
+    /// return None if component is not registered.
     pub(in crate) fn storage_ref(&self,id : TypeId) 
         -> Option<RwLockReadGuard<'_,Box<dyn ComponentStorage>>> {
         self.components
@@ -82,8 +82,8 @@ impl World {
             .map(|rwlock|rwlock.read().unwrap())
     }
 
-    /// Get lock guard of raw component storage
-    /// return None if component was not registered
+    /// Get lock guard of raw component storage,
+    /// return None if component is not registered.
     pub(in crate) fn storage_mut(&self,id : TypeId) 
         -> Option<RwLockWriteGuard<'_,Box<dyn ComponentStorage>>> {
         self.components
@@ -93,8 +93,8 @@ impl World {
 
     /// Attach a component to an entity.  
     /// # Panics
-    /// * Panic if T was not registered
-    /// * Panic if entity_id was not existence
+    /// * Panic if T is not registered.
+    /// * Panic if entity_id not exist.
     pub fn attach_component<T: Component>(&mut self, entity_id: EntityId,component: T) {
         assert!(self.has_registered::<T>(),
                 "World:Cannot attach component because components has not been registered.");
@@ -121,11 +121,11 @@ impl World {
 
     /// Detach a component from an entity.
     /// # Details
-    /// Return None if entity didn't have this component,  
+    /// Return None if entity doesn't have this component,  
     /// otherwise return Some(component)
     /// # Panics
-    /// * Panic if T was not registered
-    /// * Panic if entity_id was not existence
+    /// * Panic if T is not registered.
+    /// * Panic if entity_id not exist.
     pub fn detach_component<T: Component>(&mut self, entity_id: EntityId) -> Option<T> {
         assert!(self.has_registered::<T>(),
                 "World:Cannot detach component because components has not been registered.");
@@ -148,12 +148,12 @@ impl World {
         sparse_set.remove(entity_id)
     }
 
-    /// Check if an id exists in world.
+    /// Check if id exists in World.
     pub fn exist(&mut self, entity_id: EntityId) -> bool {
         self.entity_manager.has(entity_id)
     }
 
-    /// Get an EntityRef from an EntityId, return None if id doesn't exist in world.
+    /// Get EntityRef from an EntityId, return None if id not exist in World.
     pub fn entity(&mut self, entity_id: EntityId) -> Option<EntityRef<'_>> {
         if self.exist(entity_id) {
             Some(EntityRef::new(self, entity_id))
@@ -162,7 +162,7 @@ impl World {
         }
     }
 
-    /// Get all entities ids
+    /// Get ids of all the entites.
     pub fn entities(&self) -> &[EntityId] {
         self.entity_manager.entities()
     }
@@ -171,8 +171,8 @@ impl World {
     /// ## Details
     /// See [group](crate::group)
     /// ## Panics
-    /// * Panic if group same as any group in world
-    /// * Panic if component had already been owned by another group
+    /// * Panic if group is the same as another group in World.
+    /// * Panic if component is owned by another group.
     pub fn make_group<G: Group + 'static>(&mut self, group: G) {
         assert!(!self.has_group(&group),
                 "World: Cannot make group because world has a same group");
@@ -200,8 +200,8 @@ impl World {
         self.groups.push(RwLock::new(Box::new(group)));
     }
 
-    /// Check world has same group  
-    /// Return true if group was same as any group in world
+    /// Check if group exist in World.
+    /// Return true if group is the same as another group in World.
     pub fn has_group<G: Group + 'static>(&self, group: &G) -> bool {
         for world_group in &self.groups {
             let world_group = world_group.read().unwrap();
@@ -225,7 +225,7 @@ impl World {
                     && group.owning_types() == world_group.owning_types()
             })
             // unwrap here
-            // the existence will be ensured by outside function
+            // existence will be ensured by an outside function
             .unwrap()
             .read()
             .unwrap()

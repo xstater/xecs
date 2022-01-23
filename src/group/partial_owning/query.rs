@@ -55,7 +55,7 @@ impl<'a,A : Component,B : Component> Iterator for IterRefRef<'a,A,B> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.length {
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &*self.sparse_set_a };
@@ -70,9 +70,9 @@ impl<'a,A : Component,B : Component> Iterator for IterRefRef<'a,A,B> {
                 sparse_set_a.data().get_unchecked(self.index)
             };
             // Unwrap here
-            // If this panic,the group are destroyed.
+            // This panics while group is destroyed.
             // But group is matained by internal.
-            // So it never fails
+            // So it never fails.
             let data_b = sparse_set_b.get(id).unwrap();
             self.index += 1;
             Some((data_a,data_b))
@@ -92,7 +92,7 @@ impl<'a,A: Component,B: Component> ExactSizeIterator for IterRefRef<'a,A,B> {}
 impl<'a,A : Component,B : Component> QueryIterator for IterRefRef<'a,A,B> {
     fn from_id(&mut self,id : EntityId) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because self.sparse_set is 
+        // Safe here, because self.sparse_set is 
         // a pointer from borrow,
         // This pointer is valid now.
         let sparse_set_a = unsafe { &*self.sparse_set_a };
@@ -108,7 +108,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterRefRef<'a,A,B> {
     fn next_with_id(&mut self) -> Option<(EntityId,Self::Item)> {
         if self.index < self.length {
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &*self.sparse_set_a };
@@ -123,9 +123,9 @@ impl<'a,A : Component,B : Component> QueryIterator for IterRefRef<'a,A,B> {
                 sparse_set_a.data().get_unchecked(self.index)
             };
             // Unwrap here
-            // If this panic,the group are destroyed.
+            // This panics while group is destroyed.
             // But group is matained by internal.
-            // So it never fails
+            // So it never fails.
             let data_b = sparse_set_b.get(id).unwrap();
             self.index += 1;
             Some((id,(data_a,data_b)))
@@ -193,7 +193,7 @@ impl<'a,A : Component,B : Component> Iterator for IterRefMut<'a,A,B> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.length {
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &*self.sparse_set_a };
@@ -208,7 +208,7 @@ impl<'a,A : Component,B : Component> Iterator for IterRefMut<'a,A,B> {
                 sparse_set_a.data().get_unchecked(self.index)
             };
             // Unwrap here
-            // If this panic,the group are destroyed.
+            // This panics while group is destroyed.
             // But group is matained by internal.
             // So it never fails
             let data_b = sparse_set_b.get_mut(id).unwrap();
@@ -230,7 +230,7 @@ impl<'a,A: Component,B: Component> ExactSizeIterator for IterRefMut<'a,A,B> {}
 impl<'a,A : Component,B : Component> QueryIterator for IterRefMut<'a,A,B> {
     fn from_id(&mut self,id : EntityId) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because self.sparse_set is 
+        // Safe here, because self.sparse_set is 
         // a pointer from borrow,
         // This pointer is valid now.
         let sparse_set_a = unsafe { &*self.sparse_set_a };
@@ -246,7 +246,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterRefMut<'a,A,B> {
     fn next_with_id(&mut self) -> Option<(EntityId,Self::Item)> {
         if self.index < self.length {
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &*self.sparse_set_a };
@@ -261,7 +261,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterRefMut<'a,A,B> {
                 sparse_set_a.data().get_unchecked(self.index)
             };
             // Unwrap here
-            // If this panic,the group are destroyed.
+            // This panics while group is destroyed.
             // But group is matained by internal.
             // So it never fails
             let data_b = sparse_set_b.get_mut(id).unwrap();
@@ -333,7 +333,7 @@ impl<'a,A : Component,B : Component> Iterator for IterMutRef<'a,A,B> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.length {
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &mut *self.sparse_set_a };
@@ -348,7 +348,7 @@ impl<'a,A : Component,B : Component> Iterator for IterMutRef<'a,A,B> {
                 sparse_set_a.data_mut().get_unchecked_mut(self.index)
             };
             // Unwrap here
-            // If this panic,the group are destroyed.
+            // This panics while group is destroyed.
             // But group is matained by internal.
             // So it never fails
             let data_b = sparse_set_b.get(id).unwrap();
@@ -370,7 +370,7 @@ impl<'a,A: Component,B: Component> ExactSizeIterator for IterMutRef<'a,A,B> {}
 impl<'a,A : Component,B : Component> QueryIterator for IterMutRef<'a,A,B> {
     fn from_id(&mut self,id : EntityId) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because self.sparse_set is 
+        // Safe here, because self.sparse_set is 
         // a pointer from borrow,
         // This pointer is valid now.
         let sparse_set_a = unsafe { &mut *self.sparse_set_a };
@@ -386,7 +386,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutRef<'a,A,B> {
     fn next_with_id(&mut self) -> Option<(EntityId,Self::Item)> {
         if self.index < self.length {
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &mut *self.sparse_set_a };
@@ -401,7 +401,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutRef<'a,A,B> {
                 sparse_set_a.data_mut().get_unchecked_mut(self.index)
             };
             // Unwrap here
-            // If this panic,the group are destroyed.
+            // This panics while group is destroyed.
             // But group is matained by internal.
             // So it never fails
             let data_b = sparse_set_b.get(id).unwrap();
@@ -471,7 +471,7 @@ impl<'a,A : Component,B : Component> Iterator for IterMutMut<'a,A,B> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.length {
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &mut *self.sparse_set_a };
@@ -486,7 +486,7 @@ impl<'a,A : Component,B : Component> Iterator for IterMutMut<'a,A,B> {
                 sparse_set_a.data_mut().get_unchecked_mut(self.index)
             };
             // Unwrap here
-            // If this panic,the group are destroyed.
+            // This panics while group is destroyed.
             // But group is matained by internal.
             // So it never fails
             let data_b = sparse_set_b.get_mut(id).unwrap();
@@ -508,7 +508,7 @@ impl<'a,A: Component,B: Component> ExactSizeIterator for IterMutMut<'a,A,B> {}
 impl<'a,A : Component,B : Component> QueryIterator for IterMutMut<'a,A,B> {
     fn from_id(&mut self,id : EntityId) -> Option<Self::Item> {
         // Safety:
-        // Safe here,because self.sparse_set is 
+        // Safe here, because self.sparse_set is 
         // a pointer from borrow,
         // This pointer is valid now.
         let sparse_set_a = unsafe { &mut *self.sparse_set_a };
@@ -524,7 +524,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutMut<'a,A,B> {
     fn next_with_id(&mut self) -> Option<(EntityId,Self::Item)> {
         if self.index < self.length {
             // Safety:
-            // Safe here,because self.sparse_set is 
+            // Safe here, because self.sparse_set is 
             // a pointer from borrow,
             // This pointer is valid now.
             let sparse_set_a = unsafe { &mut *self.sparse_set_a };
@@ -539,7 +539,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutMut<'a,A,B> {
                 sparse_set_a.data_mut().get_unchecked_mut(self.index)
             };
             // Unwrap here
-            // If this panic,the group are destroyed.
+            // This panics while group is destroyed.
             // But group is matained by internal.
             // So it never fails
             let data_b = sparse_set_b.get_mut(id).unwrap();

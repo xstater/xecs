@@ -5,7 +5,7 @@ use crate::component::Component;
 use crate::sparse_set::SparseSet;
 use crate::world::World;
 
-/// An ID of entity ,starting at 1 ,can be re-used
+/// An ID of entity, starting at 1, can be re-used
 pub type EntityId = NonZeroUsize;
 /// A slice of EntityId
 pub type Entities = [EntityId];
@@ -30,13 +30,13 @@ impl<'a> EntityRef<'a>{
         self.id
     }
 
-    /// Attach a component to this entity
+    /// Attach a component to entity
     pub fn attach<T : Component>(self,component : T) -> EntityRef<'a>{
         self.world.attach_component(self.id,component);
         self
     }
 
-    /// Detach a component from this entity
+    /// Detach a component from entity
     pub fn detach<T : Component>(self) -> EntityRef<'a>{
         self.world.detach_component::<T>(self.id);//ignore the error
         self
@@ -44,7 +44,7 @@ impl<'a> EntityRef<'a>{
 
     /// Manipulate component of current entity
     /// # Panics
-    /// Panic if component was not registered
+    /// Panic if component is not registered
     pub fn with_component<T,F>(self,mut f : F) -> EntityRef<'a>
     where T : Component,
           F : FnMut(&T) {
@@ -61,7 +61,7 @@ impl<'a> EntityRef<'a>{
                 storage.downcast_ref::<SparseSet<EntityId,T>>()
             };
             // SAFTY:
-            // Safe here because id was valid when EntityRef was alive
+            // Safe here because id was valid when EntityRef is alive
             let component = unsafe {
                 sparse_set.get_unchecked(self.id)
             };
@@ -72,7 +72,7 @@ impl<'a> EntityRef<'a>{
 
     /// Manipulate component of current entity
     /// # Panics
-    /// Panic if component was not registered
+    /// Panic if component is not registered
     pub fn with_component_mut<T,F>(self,mut f : F) -> EntityRef<'a>
     where T : Component,
           F : FnMut(&mut T) {
@@ -89,7 +89,7 @@ impl<'a> EntityRef<'a>{
                 storage.downcast_mut::<SparseSet<EntityId,T>>()
             };
             // SAFTY:
-            // Safe here because id was valid when EntityRef was alive
+            // Safe here because id was valid when EntityRef is alive
             let component = unsafe {
                 sparse_set.get_unchecked_mut(self.id)
             };
@@ -139,7 +139,7 @@ impl EntityManager {
         }else{
             //full
             let id = self.entity_flags.len();
-            // safe here: because id cannot be zero
+            // safe here because id cannot be zero
             let id = unsafe { EntityId::new_unchecked(id) };
             self.entities.push(id);
             self.entity_flags.push(EntityFlag::Unavailable(self.entities.len() - 1));
@@ -148,17 +148,17 @@ impl EntityManager {
         }
     }
 
-    // remove an entity id
-    // Do nothing if entity_id is not existence
+    // remove entity id
+    // Do nothing if entity_id not exist
     pub(in crate) fn remove(&mut self,entity_id : EntityId) {
         let entity_id_ = entity_id.get();
         if let EntityFlag::Unavailable(index) = self.entity_flags[entity_id_] {
-            // unwrap safe : in this branch,we must has one entity at least
+            // unwrap safe: in this branch, we must have one entity at least
             let the_last_one_id = self.entities.last().unwrap();
             // move this entity to the end of entities
             self.entity_flags[the_last_one_id.get()] = EntityFlag::Unavailable(index);
             self.entities.swap_remove(index);
-            // keep this destroyed id be a chain
+            // keep these destroyed ids being a chain
             self.entity_flags[entity_id_] = self.entity_flags[0];
             self.entity_flags[0] = EntityFlag::Available(entity_id);
         }
