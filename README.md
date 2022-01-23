@@ -1,57 +1,51 @@
 # XECS
-xecs is a rust Entity-Component-System library
-# Details
-XECS is a Grouped ECS library.
-# Examples
-### Create an empty world
-```rust
+An Entity-Component-System library
+## Example
+```no_run
+// Define two components struct
+// Component is Send + Sync + 'static
+#[derive(Debug,Copy)]
+struct Position{
+    x : f32,
+    y : f32
+};
+struct Hidden;
+
+// create an empty world
 let mut world = World::new();
-```
-### Register some components
-Component is T : Send + Sync + 'static
-```rust
-struct Position(f64,f64,f64);
-struct Particle;
-world.register::<Position>();
-world.register::<Particle>();
-```
-### Create 100 entities with Position and Particle components
-```rust
-for _ in 0..100 {
-    world
-        .create_entity()
-        .attach(Position(1.0,2.0,1.2))
-        .attach(Particle);
+
+// generate 10 entities
+for _ in 0..10 {
+    let x = random();
+    lety = random();
+    // andomly generate the positions
+    world.create_entity()
+        .attach(Position { x,y });
 }
 
-```
-### Make a full-owning group to improve the performance of query iteration
-```rust
-world.make_group::<(Particle,Position)>(true,true);
-```
-### Create a system and update all entities with Position and Particle components
-```rust
-struct UpdatePosition;
-impl<'a> System<'a> for UpdatePosition {
-    type InitResource = ();
-    type Resource = (&'a mut World);
-    type Dependencies = ();
-    type Error = Infallible;
+// print all postions
+for pos in world.query::<&Position>() {
+    print!("{:?}",pos)
+}
 
+// filter some entities need to be hidden
+let ids = world.query::<&Position>()
+    .with_id()
+    .filter(|(_,_)|random())
+    .map(|(id,_)|id)
+    .collect::<Vec<_>>();
 
-    fn update(&'a mut self, world : RefMut<'a,World>) -> Result<(),Self::Error> {
-        for (pos,_tag) in world.query::<(&mut Position,&Particle)>() {
-            pos.0 += 1.1;
-            pos.1 += 1.2;
-            pos.3 += 1.4;
-        }
-        Ok(())
-    }
+// attach hidden to id
+for id in ids {
+    world.attach_component(id,Hidden);
+}
+
+// make a full-owning group to accelerate the query
+world.make_group(full_owning::<Hidden,Position>());
+
+// only print postions with id that is not hidden
+for (id,data) in world.query::<&Position,Without<&Hidden>>() {
+    print!("{}:{:?}",id,data);
 }
 ```
-### Add system to stage and run this stage
-```rust
-let mut stage = Stage::from_world(world);
-stage.add_system(UpdatePosition);
-stage.run();
-```
+
