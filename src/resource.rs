@@ -1,5 +1,6 @@
 use std::{any::Any, fmt::{Debug, Display}, marker::PhantomData, ops::{Deref, DerefMut}, sync::{RwLockReadGuard, RwLockWriteGuard}};
 
+/// A read lock gurad for resource
 pub struct ResourceRead<'a,T> {
     lock : RwLockReadGuard<'a,Option<Box<dyn Any + Send + Sync>>>,
     _marker : PhantomData<T>
@@ -42,6 +43,7 @@ impl<'a,T : 'static + Send + Sync + Display> Display for ResourceRead<'a,T> {
 
 
 
+/// A write lock gurad for resource
 pub struct ResourceWrite<'a,T> {
     lock : RwLockWriteGuard<'a,Option<Box<dyn Any + Send + Sync>>>,
     _marker : PhantomData<T>
