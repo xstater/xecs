@@ -8,8 +8,9 @@ use crate::component::{Component, ComponentStorage};
 use crate::entity::{EntityId, EntityManager, EntityRef};
 use crate::group::Group;
 use crate::query::{QueryIterator, Queryable};
+use crate::resource::{ResourceRead, ResourceWrite};
 use crate::sparse_set::SparseSet;
-use std::any::TypeId;
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -20,6 +21,7 @@ pub struct World {
     // Box<SparseSet<EntityId,Component>>
     components: HashMap<TypeId,RwLock<Box<dyn ComponentStorage>>>,
     groups: Vec<RwLock<Box<dyn Group>>>,
+    resources : HashMap<TypeId,RwLock<Option<Box<dyn Any + Send + Sync>>>>
 }
 
 impl World {
@@ -29,6 +31,53 @@ impl World {
             entity_manager: EntityManager::new(),
             components: Default::default(),
             groups: Default::default(),
+            resources : Default::default()
+        }
+    }
+
+    /// Store resource in world 
+    pub fn store_resource<R : 'static + Send + Sync>(&mut self,resource : R) {
+        let type_id = TypeId::of::<R>();
+        if !self.resources.contains_key(&type_id) {
+            self.resources.insert(type_id,RwLock::new(Option::None));
+        }
+        self.resources.get(&type_id).unwrap() //This never fails
+            .write().unwrap()
+            .replace(Box::new(resource));
+    }
+
+    /// Fetch resource from world
+    pub fn fetch_resource<R : 'static + Send + Sync>(&mut self) -> Option<R> {
+        let type_id = TypeId::of::<R>();
+        let res = self.resources.get(&type_id)?
+            .write().unwrap()
+            .take()?;
+        // This never fails
+        // because the type_id was checked before
+        Some(*res.downcast::<R>().unwrap())
+    }
+
+    /// Get a read guard of resource
+    pub fn resource_ref<R : 'static + Send + Sync>(&self) -> Option<ResourceRead<'_,R>> {
+        let type_id = TypeId::of::<R>();
+        let lock = self.resources.get(&type_id)?
+            .read().unwrap();
+        if lock.is_none() {
+            Option::None
+        } else {
+            Some(ResourceRead::from_read(lock))
+        }
+    }
+
+    /// Get a write guard of resource
+    pub fn resource_mut<R : 'static + Send + Sync>(&self) -> Option<ResourceWrite<'_,R>> {
+        let type_id = TypeId::of::<R>();
+        let lock = self.resources.get(&type_id)?
+            .write().unwrap();
+        if lock.is_none() {
+            Option::None
+        } else {
+            Some(ResourceWrite::from_write(lock))
         }
     }
 
@@ -383,6 +432,34 @@ mod tests {
         world.create_entity().attach('a');
 
         println!("{:?}", world);
+    }
+
+    #[test]
+    fn resource_test() {
+        let mut world = World::new();
+        #[derive(Debug)]
+        struct Test {
+            name : String,
+            age : u32
+        }
+        
+        world.store_resource(Test{
+            name : "affff".to_string(),
+            age : 12
+        });
+
+        assert!(world.resource_ref::<Test>().is_some());
+        assert_eq!(world.resource_ref::<Test>().unwrap().age,12);
+
+        world.resource_mut::<Test>().unwrap().age = 13;
+
+        assert_eq!(world.resource_ref::<Test>().unwrap().age,13);
+
+        let test = world.fetch_resource::<Test>().unwrap();
+
+        assert_eq!(test.age,13);
+        assert_eq!(test.name.as_str(),"affff");
+
     }
 
 }

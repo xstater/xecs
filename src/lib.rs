@@ -63,4 +63,6 @@ pub mod query;
 pub mod sparse_set;
 /// The system trait
 pub mod system;
+/// The resource type
+pub mod resource;
 
