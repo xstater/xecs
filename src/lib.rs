@@ -59,8 +59,7 @@ pub mod component;
 pub mod group;
 /// The query functions
 pub mod query;
-/// An implemention of sparse set
-pub mod sparse_set;
+pub(in crate) mod sparse_set;
 /// The system trait
 pub mod system;
 /// The resource type

@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 
 #[derive(Debug,Clone)]
-pub struct SparseSet<E,T>
+pub(in crate) struct SparseSet<E,T>
     where E : Copy + Into<usize>,
           T : Sized{
     pub (in crate) indices : Vec<Option<NonZeroUsize>>,
@@ -60,7 +60,7 @@ impl<E,T> SparseSet<E,T>
         None
     }
 
-    pub fn swap_by_index(&mut self,index_a : usize,index_b : usize) {
+    pub(in crate) fn swap_by_index(&mut self,index_a : usize,index_b : usize) {
         if index_a == index_b { return; }
         if index_a >= self.len() {
             panic!("index_a={} is out of range",index_a);
@@ -75,7 +75,8 @@ impl<E,T> SparseSet<E,T>
         self.data.swap(index_a,index_b);
     }
 
-    pub fn swap_by_entity(&mut self,entity_a : E,entity_b : E) {
+    #[allow(unused)]
+    pub(in crate) fn swap_by_entity(&mut self,entity_a : E,entity_b : E) {
         if !self.exist(entity_a) {
             panic!("entity_a is not exist in sparse set");
         }
@@ -153,6 +154,7 @@ impl<E,T> SparseSet<E,T>
         self.entities.len() == 0
     }
 
+    #[allow(unused)]
     pub fn indices(&self) -> &[Option<NonZeroUsize>] {
         self.indices.as_slice()
     }
@@ -161,16 +163,9 @@ impl<E,T> SparseSet<E,T>
         self.entities.as_slice()
     }
 
+    #[allow(unused)]
     pub fn entities_mut(&mut self) -> &mut [E] {
         self.entities.as_mut_slice()
-    }
-
-    pub unsafe fn all_mut(&mut self) -> (&mut [Option<NonZeroUsize>],&mut [E],&mut [T]) {
-        (&mut self.indices,&mut self.entities,&mut self.data)
-    }
-
-    pub unsafe fn data_with_id(&self) -> (&[E],&[T]){
-        (&self.entities,&self.data)
     }
 
     pub fn data(&self) -> &[T] {

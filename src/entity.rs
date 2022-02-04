@@ -7,27 +7,25 @@
 //! When you call ```world.create_entity()```, an ID will be allocated automatically. 
 //! If you call ```world.remove_entity(id)```, this ID will be a pit. If the 
 //! next ```world.create_entity()``` is called, it will allocate this ID to fill 
-//! the pit.Thanks to [sparse set](crate::sparse_set), it's still fast to 
+//! the pit.Thanks to sparse set, it's still fast to 
 //! iterate all components no matter how random of ID
-use std::any::TypeId;
 use std::num::NonZeroUsize;
 use crate::component::Component;
-use crate::sparse_set::SparseSet;
 use crate::world::World;
 
 /// The type of ID of entity which starts from 1 and can be recycled automatically
 pub type EntityId = NonZeroUsize;
 
-/// A useful struct for manipulating a entity
+/// A useful struct for building a entity
 #[derive(Debug)]
-pub struct EntityRef<'a>{
+pub struct EntityBuilder<'a>{
     world : &'a mut World,
     id : EntityId,
 }
 
-impl<'a> EntityRef<'a>{
-    pub(in crate) fn new(world : &'a mut World,entity_id : EntityId) -> EntityRef<'a>{
-        EntityRef{
+impl<'a> EntityBuilder<'a>{
+    pub(in crate) fn new(world : &'a mut World,entity_id : EntityId) -> Self{
+        EntityBuilder{
             world,
             id: entity_id,
         }
@@ -39,72 +37,17 @@ impl<'a> EntityRef<'a>{
     }
 
     /// Attach a component to entity
-    pub fn attach<T : Component>(self,component : T) -> EntityRef<'a>{
+    pub fn attach<T : Component>(self,component : T) -> Self{
         self.world.attach_component(self.id,component);
         self
     }
 
     /// Detach a component from entity
-    pub fn detach<T : Component>(self) -> EntityRef<'a>{
+    pub fn detach<T : Component>(self) -> Self{
         self.world.detach_component::<T>(self.id);//ignore the error
         self
     }
 
-    /// Manipulate component of current entity
-    /// # Panics
-    /// Panic if component is not registered
-    pub fn with_component<T,F>(self,mut f : F) -> EntityRef<'a>
-    where T : Component,
-          F : FnMut(&T) {
-        assert!(self.world.has_registered::<T>(),
-                "EntityRef: Component was not registered in world");
-        {
-            // unwrap here:
-            // assert before ensure this
-            let type_id = TypeId::of::<T>();
-            let storage = self.world.storage_ref(type_id).unwrap();
-            // SAFTY:
-            // Safe here because the raw type of Box<dyn ...> is SparseSet<EntityId,T>
-            let sparse_set = unsafe {
-                storage.downcast_ref::<SparseSet<EntityId,T>>()
-            };
-            // SAFTY:
-            // Safe here because id was valid when EntityRef is alive
-            let component = unsafe {
-                sparse_set.get_unchecked(self.id)
-            };
-            f(component);
-        }
-        self
-    }
-
-    /// Manipulate component of current entity
-    /// # Panics
-    /// Panic if component is not registered
-    pub fn with_component_mut<T,F>(self,mut f : F) -> EntityRef<'a>
-    where T : Component,
-          F : FnMut(&mut T) {
-        assert!(self.world.has_registered::<T>(),
-                "EntityRef: Component was not registered in world");
-        {
-            // unwrap here:
-            // assert before ensure this
-            let type_id = TypeId::of::<T>();
-            let mut storage = self.world.storage_mut(type_id).unwrap();
-            // SAFTY:
-            // Safe here because the raw type of Box<dyn ...> is SparseSet<EntityId,T>
-            let sparse_set = unsafe {
-                storage.downcast_mut::<SparseSet<EntityId,T>>()
-            };
-            // SAFTY:
-            // Safe here because id was valid when EntityRef is alive
-            let component = unsafe {
-                sparse_set.get_unchecked_mut(self.id)
-            };
-            f(component);
-        }
-        self
-    }
 }
 
 #[derive(Debug,Copy,Clone)]

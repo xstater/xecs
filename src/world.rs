@@ -4,8 +4,8 @@
 //! ensure the borrow check relations of all components.And [World](crate::world::World) can also
 //! be ```Send + Sync```.Therefore,the all other states of world can be guarded
 //! by [RwLock](std::sync::RwLock).So we can use world in concurrency environment by ```RwLock<World>```.
-use crate::component::{Component, ComponentStorage};
-use crate::entity::{EntityId, EntityManager, EntityRef};
+use crate::component::{Component, ComponentRead, ComponentStorage, ComponentWrite};
+use crate::entity::{EntityBuilder, EntityId, EntityManager};
 use crate::group::Group;
 use crate::query::{QueryIterator, Queryable};
 use crate::resource::{ResourceRead, ResourceWrite};
@@ -102,10 +102,10 @@ impl World {
     }
 
     /// Create an entity without any component in World,
-    ///  return an [EntityRef](crate::entity::EntityRef).
-    pub fn create_entity(&mut self) -> EntityRef<'_> {
+    ///  return an [EntityBuilder](crate::entity::EntityBuilder).
+    pub fn create_entity(&mut self) -> EntityBuilder<'_> {
         let id = self.entity_manager.create();
-        EntityRef::new(self, id)
+        EntityBuilder::new(self, id)
     }
 
     /// Remove entity and its components.
@@ -207,19 +207,23 @@ impl World {
         self.entity_manager.has(entity_id)
     }
 
-    /// Get an [EntityRef](crate::entity::EntityRef) from the ```entity_id```, 
-    /// return ```None``` if ```entity_id``` not exists in World.
-    pub fn entity(&mut self, entity_id: EntityId) -> Option<EntityRef<'_>> {
-        if self.exist(entity_id) {
-            Some(EntityRef::new(self, entity_id))
-        } else {
-            None
-        }
-    }
-
     /// Get ids of all the entites.
     pub fn entities(&self) -> &[EntityId] {
         self.entity_manager.entities()
+    }
+
+    /// Get the component storage's read guard
+    pub fn component_ref<T : Component>(&self) -> Option<ComponentRead<'_,T>> {
+        let type_id = TypeId::of::<T>();
+        let lock = self.storage_ref(type_id)?;
+        Some(ComponentRead::from_lock(lock))
+    }
+
+    /// Get the component storage's write guard
+    pub fn component_mut<T : Component>(&self) -> Option<ComponentWrite<'_,T>> {
+        let type_id = TypeId::of::<T>();
+        let lock = self.storage_mut(type_id)?;
+        Some(ComponentWrite::from_lock(lock))
     }
 
     /// Make a [group](crate::group) to accelerate the iteration.
@@ -291,18 +295,6 @@ impl World {
         <T as Queryable<'a>>::query(self)
     }
 
-    #[allow(dead_code)]
-    fn with_components_ref<T,F>(&self,mut f : F)
-    where F : FnMut(&[T]),
-          T : Component{
-        let id = TypeId::of::<T>();
-        let storage = self.storage_ref(id).unwrap();
-        let components = unsafe {
-            storage.downcast_ref::<SparseSet<EntityId,T>>()
-        }.data();
-        f(components)
-    }
-
 }
 
 impl Debug for World {
@@ -336,15 +328,18 @@ mod tests {
         world.attach_component(id1, 'c');
         world.attach_component(id2, 'a');
 
-        world.with_components_ref(|components : &[char]|{
+        {
+            let components = world.component_ref::<char>().unwrap();
+            let components = components.data();
             assert_eq!(components,&['c','a'])
-        });
-
+        }
         world.remove_entity(id1);
 
-        world.with_components_ref(|components : &[char]|{
+        {
+            let components = world.component_ref::<char>().unwrap();
+            let components = components.data();
             assert_eq!(components,&['a'])
-        });
+        }
     }
 
     #[test]
@@ -392,23 +387,21 @@ mod tests {
         print::<()>(&world, "()  :");
         println!();
 
-        world
-            .entity(id2)
-            .and_then(|entity| Some(entity.attach('b')));
+        world.attach_component(id2,'b');
         println!("#attach component char b for id=2");
         print::<u32>(&world, "u32 :");
         print::<char>(&world, "char:");
         print::<()>(&world, "()  :");
         println!();
 
-        world.entity(id7).unwrap().attach(2u32);
+        world.attach_component(id7,2u32);
         println!("#attach component u32=2 for id=7");
         print::<u32>(&world, "u32 :");
         print::<char>(&world, "char:");
         print::<()>(&world, "()  :");
         println!();
 
-        world.entity(id3).unwrap().detach::<u32>();
+        world.detach_component::<u32>(id3);
         println!("#detach component u32 for id=3");
         print::<u32>(&world, "u32 :");
         print::<char>(&world, "char:");

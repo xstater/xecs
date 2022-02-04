@@ -1,10 +1,12 @@
+use std::sync::{RwLockReadGuard, RwLockWriteGuard};
+
 use crate::{entity::EntityId, sparse_set::SparseSet};
 
 /// The Component trait  
 pub trait Component : Send + Sync + 'static {}
 impl<T : Send + Sync + 'static> Component for T{}
 
-/// A trait to make [SparseSet](crate::sparse_set::SparseSet) dynamic  
+/// A trait to make sparse set dynamic  
 pub trait ComponentStorage : Send + Sync{
     /// Check if storage has ```entity_id```
     fn has(&self,entity_id : EntityId) -> bool;
@@ -59,3 +61,122 @@ impl dyn 'static + ComponentStorage {
         &mut *(self as *mut dyn ComponentStorage as *mut T)
     }
 }
+
+
+pub struct ComponentRead<'a,T>{
+    _lock : RwLockReadGuard<'a,Box<dyn ComponentStorage>>,
+    ptr : *const SparseSet<EntityId,T>
+}
+
+impl<'a,T : Component> ComponentRead<'a,T> {
+    pub(in crate) fn from_lock(lock : RwLockReadGuard<'a,Box<dyn ComponentStorage>>) -> Self {
+        // Safety:
+        // 1.box has type SparseSet<EntityId,T>
+        let ptr = unsafe {
+            lock.downcast_ref::<SparseSet<EntityId,T>>()
+        } as *const _;
+        ComponentRead {
+            _lock : lock,
+            ptr,
+        }
+    }
+
+    pub fn count(&self) -> usize {
+        let sparse_set = unsafe { &*self.ptr };
+        sparse_set.len()
+    }
+
+    pub fn exist(&self,id : EntityId) -> bool {
+        let sparse_set = unsafe { &*self.ptr };
+        sparse_set.exist(id)
+    }
+
+    pub fn get(&self,id : EntityId) -> Option<&T> {
+        let sparse_set = unsafe { &*self.ptr };
+        sparse_set.get(id)
+    }
+
+    pub unsafe fn get_unchecked(&self,id : EntityId) -> &T {
+        let sparse_set = &*self.ptr;
+        sparse_set.get_unchecked(id)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        let sparse_set = unsafe { &*self.ptr };
+        sparse_set.is_empty()
+    }
+
+    pub fn data(&self) -> &[T] {
+        let sparse_set = unsafe { &*self.ptr };
+        sparse_set.data()
+    }
+
+}
+
+
+
+
+pub struct ComponentWrite<'a,T>{
+    _lock : RwLockWriteGuard<'a,Box<dyn ComponentStorage>>,
+    ptr : *mut SparseSet<EntityId,T>
+}
+
+impl<'a,T : Component> ComponentWrite<'a,T> {
+    pub(in crate) fn from_lock(mut lock : RwLockWriteGuard<'a,Box<dyn ComponentStorage>>) -> Self {
+        // Safety:
+        // 1.box has type SparseSet<EntityId,T>
+        let ptr = unsafe {
+            lock.downcast_mut::<SparseSet<EntityId,T>>()
+        } as *mut _;
+        ComponentWrite{
+            _lock : lock,
+            ptr,
+        }
+    }
+
+    pub fn count(&self) -> usize {
+        let sparse_set = unsafe { &*self.ptr };
+        sparse_set.len()
+    }
+
+    pub fn exist(&self,id : EntityId) -> bool {
+        let sparse_set = unsafe { &*self.ptr };
+        sparse_set.exist(id)
+    }
+
+    pub fn get(&self,id : EntityId) -> Option<&T> {
+        let sparse_set = unsafe { &*self.ptr };
+        sparse_set.get(id)
+    }
+
+    pub unsafe fn get_unchecked(&self,id : EntityId) -> &T {
+        let sparse_set = &*self.ptr;
+        sparse_set.get_unchecked(id)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        let sparse_set = unsafe { &*self.ptr };
+        sparse_set.is_empty()
+    }
+
+    pub fn get_mut(&mut self,id : EntityId) -> Option<&mut T> {
+        let sparse_set = unsafe { &mut *self.ptr };
+        sparse_set.get_mut(id)
+    }
+
+    pub unsafe fn get_unchecked_mut(&mut self,id : EntityId) -> &mut T {
+        let sparse_set = &mut *self.ptr;
+        sparse_set.get_unchecked_mut(id)
+    }
+
+    pub fn data(&self) -> &[T] {
+        let sparse_set = unsafe { &*self.ptr };
+        sparse_set.data()
+    }
+
+    pub fn data_mut(&mut self) -> &mut [T] {
+        let sparse_set = unsafe { &mut *self.ptr };
+        sparse_set.data_mut()
+    }
+}
+

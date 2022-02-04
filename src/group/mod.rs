@@ -3,7 +3,7 @@
 //! ## Acceleration Principle
 //! To make iteration more fast and more cache friendly, we can rearrange the ord 
 //! of items. Group rearranges all group owning components which are both exist in their 
-//! [sparse set](crate::sparse_set) to the front of [sparse set](crate::sparse_set).  
+//! sparse set to the front of sparse set.  
 //! We classify the groups as 3 types by the owner of components storage.  
 //! **Component storage can only be owned by one group** 
 //! ### Full-Owning Group
@@ -13,7 +13,7 @@
 //! Partial-Owning only owns the first storage.It's not faster than Full-Owning group but 
 //! it can stil make iteration fast
 //! ### Non-Owning Group
-//! This group does not own any storage.It use an extra [sparse set](crate::sparse_set) to 
+//! This group does not own any storage.It use an extra sparse set to 
 //! record the entities owned by all storage.Although it's the slowest group and it need more 
 //! memory to accelerate the iteration,it sill fast than raw query iteration.
 use std::{any::TypeId, sync::{RwLockReadGuard, RwLockWriteGuard}};
