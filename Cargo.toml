@@ -1,7 +1,7 @@
 [package]
 name = "xecs"
-version = "0.4.2"
-authors = ["xstater@a166224@gmail.com"]
+version = "0.5.0"
+authors = ["xstater:a166224@163.com"]
 edition = "2021"
 license = "MIT"
 description = "An Entity-Component-System library"
