@@ -1,4 +1,4 @@
-use std::sync::{RwLockReadGuard, RwLockWriteGuard};
+use std::{ops::{Deref, DerefMut}, sync::{RwLockReadGuard, RwLockWriteGuard}};
 
 use crate::{entity::EntityId, sparse_set::SparseSet};
 
@@ -180,3 +180,73 @@ impl<'a,T : Component> StorageWrite<'a,T> {
     }
 }
 
+
+
+
+pub struct ComponentRead<'a,T> {
+    id : EntityId,
+    storage : StorageRead<'a,T>
+}
+
+impl<'a,T : Component> ComponentRead<'a,T> {
+    /// Safety:
+    /// Safe only id is valid
+    pub(in crate) unsafe fn new(id : EntityId,storage : StorageRead<'a,T>) -> Self {
+        ComponentRead{
+            id,
+            storage,
+        }
+    }
+}
+
+impl<'a,T : Component> Deref for ComponentRead<'a,T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        // Safety:
+        // new() method ensures this action is safe
+        unsafe {
+            self.storage.get_unchecked(self.id)
+        }
+    }
+}
+
+
+
+
+pub struct ComponentWrite<'a,T> {
+    id : EntityId,
+    storage : StorageWrite<'a,T>
+}
+
+impl<'a,T : Component> ComponentWrite<'a,T> {
+    /// Safety:
+    /// Safe only id is valid
+    pub(in crate) unsafe fn new(id : EntityId,storage : StorageWrite<'a,T>) -> Self {
+        ComponentWrite{
+            id,
+            storage,
+        }
+    }
+}
+
+impl<'a,T : Component> Deref for ComponentWrite<'a,T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        // Safety:
+        // new() method ensures this action is safe
+        unsafe {
+            self.storage.get_unchecked(self.id)
+        }
+    }
+}
+impl<'a,T : Component> DerefMut for ComponentWrite<'a,T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // Safety:
+        // new() method ensures this action is safe
+        unsafe {
+            self.storage.get_unchecked_mut(self.id)
+        }
+    }
+}
