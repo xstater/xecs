@@ -42,12 +42,6 @@ impl<'a> EntityBuilder<'a>{
         self
     }
 
-    /// Detach a component from entity
-    pub fn detach<T : Component>(self) -> Self{
-        self.world.detach_component::<T>(self.id);//ignore the error
-        self
-    }
-
 }
 
 #[derive(Debug,Copy,Clone)]
