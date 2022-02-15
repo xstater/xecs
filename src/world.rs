@@ -4,7 +4,7 @@
 //! ensure the borrow check relations of all components.And [World](crate::world::World) can also
 //! be ```Send + Sync```.Therefore,the all other states of world can be guarded
 //! by [RwLock](std::sync::RwLock).So we can use world in concurrency environment by ```RwLock<World>```.
-use crate::component::{Component, ComponentRead, ComponentStorage, ComponentWrite};
+use crate::component::{Component, StorageRead, ComponentStorage, StorageWrite};
 use crate::entity::{EntityBuilder, EntityId, EntityManager};
 use crate::group::Group;
 use crate::query::{QueryIterator, Queryable};
@@ -129,7 +129,7 @@ impl World {
 
     /// Get lock guard of raw component storage,
     /// return None if component is not registered.
-    pub(in crate) fn storage_ref(&self,id : TypeId) 
+    pub(in crate) fn raw_storage_read(&self,id : TypeId) 
         -> Option<RwLockReadGuard<'_,Box<dyn ComponentStorage>>> {
         self.components
             .get(&id)
@@ -138,7 +138,7 @@ impl World {
 
     /// Get lock guard of raw component storage,
     /// return None if component is not registered.
-    pub(in crate) fn storage_mut(&self,id : TypeId) 
+    pub(in crate) fn raw_storage_write(&self,id : TypeId) 
         -> Option<RwLockWriteGuard<'_,Box<dyn ComponentStorage>>> {
         self.components
             .get(&id)
@@ -157,7 +157,7 @@ impl World {
         let type_id = TypeId::of::<T>();
         {
             // Unwrap never fails because assert ensures this
-            let mut storage = self.storage_mut(type_id).unwrap();
+            let mut storage = self.raw_storage_write(type_id).unwrap();
             // SAFTY:
             // storage is SparseSet<EntityId,T>
             let sparse_set = unsafe {
@@ -193,7 +193,7 @@ impl World {
             }
         }
         // Unwrap never fails because assert ensures this
-        let mut storage = self.storage_mut(type_id).unwrap();
+        let mut storage = self.raw_storage_write(type_id).unwrap();
         // SAFTY:
         // storage is SparseSet<EntityId,T>
         let sparse_set = unsafe {
@@ -213,17 +213,17 @@ impl World {
     }
 
     /// Get the component storage's read guard
-    pub fn component_ref<T : Component>(&self) -> Option<ComponentRead<'_,T>> {
+    pub fn components_read<T : Component>(&self) -> Option<StorageRead<'_,T>> {
         let type_id = TypeId::of::<T>();
-        let lock = self.storage_ref(type_id)?;
-        Some(ComponentRead::from_lock(lock))
+        let lock = self.raw_storage_read(type_id)?;
+        Some(StorageRead::from_lock(lock))
     }
 
     /// Get the component storage's write guard
-    pub fn component_mut<T : Component>(&self) -> Option<ComponentWrite<'_,T>> {
+    pub fn components_write<T : Component>(&self) -> Option<StorageWrite<'_,T>> {
         let type_id = TypeId::of::<T>();
-        let lock = self.storage_mut(type_id)?;
-        Some(ComponentWrite::from_lock(lock))
+        let lock = self.raw_storage_write(type_id)?;
+        Some(StorageWrite::from_lock(lock))
     }
 
     /// Make a [group](crate::group) to accelerate the iteration.
@@ -329,14 +329,14 @@ mod tests {
         world.attach_component(id2, 'a');
 
         {
-            let components = world.component_ref::<char>().unwrap();
+            let components = world.components_read::<char>().unwrap();
             let components = components.data();
             assert_eq!(components,&['c','a'])
         }
         world.remove_entity(id1);
 
         {
-            let components = world.component_ref::<char>().unwrap();
+            let components = world.components_read::<char>().unwrap();
             let components = components.data();
             assert_eq!(components,&['a'])
         }

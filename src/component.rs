@@ -63,19 +63,19 @@ impl dyn 'static + ComponentStorage {
 }
 
 
-pub struct ComponentRead<'a,T>{
+pub struct StorageRead<'a,T>{
     _lock : RwLockReadGuard<'a,Box<dyn ComponentStorage>>,
     ptr : *const SparseSet<EntityId,T>
 }
 
-impl<'a,T : Component> ComponentRead<'a,T> {
+impl<'a,T : Component> StorageRead<'a,T> {
     pub(in crate) fn from_lock(lock : RwLockReadGuard<'a,Box<dyn ComponentStorage>>) -> Self {
         // Safety:
         // 1.box has type SparseSet<EntityId,T>
         let ptr = unsafe {
             lock.downcast_ref::<SparseSet<EntityId,T>>()
         } as *const _;
-        ComponentRead {
+        StorageRead {
             _lock : lock,
             ptr,
         }
@@ -116,19 +116,19 @@ impl<'a,T : Component> ComponentRead<'a,T> {
 
 
 
-pub struct ComponentWrite<'a,T>{
+pub struct StorageWrite<'a,T>{
     _lock : RwLockWriteGuard<'a,Box<dyn ComponentStorage>>,
     ptr : *mut SparseSet<EntityId,T>
 }
 
-impl<'a,T : Component> ComponentWrite<'a,T> {
+impl<'a,T : Component> StorageWrite<'a,T> {
     pub(in crate) fn from_lock(mut lock : RwLockWriteGuard<'a,Box<dyn ComponentStorage>>) -> Self {
         // Safety:
         // 1.box has type SparseSet<EntityId,T>
         let ptr = unsafe {
             lock.downcast_mut::<SparseSet<EntityId,T>>()
         } as *mut _;
-        ComponentWrite{
+        StorageWrite{
             _lock : lock,
             ptr,
         }

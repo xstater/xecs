@@ -91,7 +91,7 @@ impl<'a,T : Component> Queryable<'a> for &'a T {
         let type_id = TypeId::of::<T>();
         // Unwrap here
         // assert before ensures this
-        let storage = world.storage_ref(type_id).unwrap();
+        let storage = world.raw_storage_read(type_id).unwrap();
         // Safety:
         // storage is SparseSet<EntityId,T>
         let sparse_set = unsafe {
@@ -190,7 +190,7 @@ impl<'a,T : Component> Queryable<'a> for &'a mut T {
         let type_id = TypeId::of::<T>();
         // Unwrap here
         // assert before ensures this
-        let mut storage = world.storage_mut(type_id).unwrap();
+        let mut storage = world.raw_storage_write(type_id).unwrap();
         // Safety:
         // storage is SparseSet<EntityId,T>
         let sparse_set = unsafe {

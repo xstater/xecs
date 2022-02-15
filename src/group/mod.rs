@@ -38,19 +38,19 @@ pub trait Group : Send + Sync{
     fn owning_types(&self) -> Vec<TypeId>;
 
     fn storage_a<'a>(&self,world : &'a World) -> RwLockReadGuard<'a,Box<dyn ComponentStorage>>{
-        world.storage_ref(self.type_id_a())
+        world.raw_storage_read(self.type_id_a())
             .expect("Group: Component was not registered in world")
     }
     fn storage_a_mut<'a>(&self,world : &'a World) ->RwLockWriteGuard<'a,Box<dyn ComponentStorage>>{
-        world.storage_mut(self.type_id_a())
+        world.raw_storage_write(self.type_id_a())
             .expect("Group: Component was not registered in world")
     }
     fn storage_b<'a>(&self,world : &'a World) -> RwLockReadGuard<'a,Box<dyn ComponentStorage>>{
-        world.storage_ref(self.type_id_b())
+        world.raw_storage_read(self.type_id_b())
             .expect("Group: Component was not registered in world")
     }
     fn storage_b_mut<'a>(&self,world : &'a World) -> RwLockWriteGuard<'a,Box<dyn ComponentStorage>>{
-        world.storage_mut(self.type_id_b())
+        world.raw_storage_write(self.type_id_b())
             .expect("Group: Component was not registered in world")
     }
 

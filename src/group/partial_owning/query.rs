@@ -23,8 +23,8 @@ impl<'a,A : Component,B : Component> Queryable<'a> for PartialOwning<&'a A,&'a B
         let type_id_b = TypeId::of::<B>();
         // Unwrap here
         // assert before ensures this
-        let storage_a = world.storage_ref(type_id_a).unwrap();
-        let storage_b = world.storage_ref(type_id_b).unwrap();
+        let storage_a = world.raw_storage_read(type_id_a).unwrap();
+        let storage_b = world.raw_storage_read(type_id_b).unwrap();
         // Safety:
         // storage is SparseSet<EntityId,...>
         let sparse_set_a = unsafe {
@@ -161,8 +161,8 @@ impl<'a,A : Component,B : Component> Queryable<'a> for PartialOwning<&'a A,&'a m
         let type_id_b = TypeId::of::<B>();
         // Unwrap here
         // assert before ensures this
-        let storage_a = world.storage_ref(type_id_a).unwrap();
-        let mut storage_b = world.storage_mut(type_id_b).unwrap();
+        let storage_a = world.raw_storage_read(type_id_a).unwrap();
+        let mut storage_b = world.raw_storage_write(type_id_b).unwrap();
         // Safety:
         // storage is SparseSet<EntityId,...>
         let sparse_set_a = unsafe {
@@ -301,8 +301,8 @@ impl<'a,A : Component,B : Component> Queryable<'a> for PartialOwning<&'a mut A,&
         let type_id_b = TypeId::of::<B>();
         // Unwrap here
         // assert before ensures this
-        let mut storage_a = world.storage_mut(type_id_a).unwrap();
-        let storage_b = world.storage_ref(type_id_b).unwrap();
+        let mut storage_a = world.raw_storage_write(type_id_a).unwrap();
+        let storage_b = world.raw_storage_read(type_id_b).unwrap();
         // Safety:
         // storage is SparseSet<EntityId,...>
         let sparse_set_a = unsafe {
@@ -439,8 +439,8 @@ impl<'a,A : Component,B : Component> Queryable<'a> for PartialOwning<&'a mut A,&
         let type_id_b = TypeId::of::<B>();
         // Unwrap here
         // assert before ensures this
-        let mut storage_a = world.storage_mut(type_id_a).unwrap();
-        let mut storage_b = world.storage_mut(type_id_b).unwrap();
+        let mut storage_a = world.raw_storage_write(type_id_a).unwrap();
+        let mut storage_b = world.raw_storage_write(type_id_b).unwrap();
         // Safety:
         // storage is SparseSet<EntityId,...>
         let sparse_set_a = unsafe {
