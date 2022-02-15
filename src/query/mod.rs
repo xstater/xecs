@@ -26,6 +26,24 @@
 //!    // do sth with data
 //! }
 //! ```
+//! # Safety
+//! Query Iterator internal has a lot of ```*const _```or```*mut _``` 
+//! to avoid borrow-checker warnings like this
+//! ```no_run
+//! pub struct IterRef<'a,T> {
+//!     index : usize,
+//!     sparse_set : *const SparseSet<EntityId,T>,
+//!     borrow : RwLockReadGuard<'a,Box<dyn ComponentStorage>>
+//! }
+//! ```
+//! This struct is NOT a Self-Reference struct! Moving this struct 
+//! is safe.  
+//! ```sparse_set``` is a pointer of ```dyn ComponentStorage```, 
+//! which means moving this struct will NOT change the address of 
+//! ```dyn ComponentStorage```. Because ```dyn ComponentStorage```
+//! is boxed by ```Box<dyn ComponentStorage>```. And the 
+//! ```sparse_set``` field's lifetime equals to borrow's ```'a```. 
+//! So the pointer is valid when this struct is alive.
 use std::{any::TypeId, sync::{RwLockReadGuard, RwLockWriteGuard}};
 use crate::{component::{Component, ComponentStorage}, entity::EntityId, sparse_set::SparseSet, world::World};
 
