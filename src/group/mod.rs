@@ -16,8 +16,8 @@
 //! This group does not own any storage.It use an extra sparse set to 
 //! record the entities owned by all storage.Although it's the slowest group and it need more 
 //! memory to accelerate the iteration,it sill fast than raw query iteration.
-use std::{any::TypeId, sync::{RwLockReadGuard, RwLockWriteGuard}};
-use crate::{component::{Component, ComponentStorage}, entity::EntityId, world::World};
+use std::{any::TypeId, intrinsics::transmute};
+use crate::{component::{Component, ComponentStorage}, entity::EntityId};
 
 /// Full-owning group and its [Queryable](crate::query::Queryable) impls
 pub mod full_owning;
@@ -30,29 +30,45 @@ pub use full_owning::FullOwning;
 pub use partial_owning::PartialOwning;
 pub use non_owning::NonOwning;
 
+#[derive(Debug,Clone,Copy,PartialEq)]
+pub enum GroupType {
+    FullOwning(TypeId,TypeId),
+    PartialOwning(TypeId,TypeId),
+    NonOwning(TypeId,TypeId)
+}
+
+impl GroupType {
+    pub fn types(&self) -> (TypeId,TypeId) {
+        match self {
+            GroupType::FullOwning(a,b) => (*a,*b),
+            GroupType::PartialOwning(a,b) => (*a,*b),
+            GroupType::NonOwning(a,b) => (*a,*b),
+        }
+    }
+
+    pub fn owned(&self,type_id : TypeId) -> bool {
+        match self {
+            GroupType::FullOwning(a,b) => 
+                type_id == *a || type_id == *b,
+            GroupType::PartialOwning(a,_) =>
+                type_id == *a,
+            GroupType::NonOwning(_, _) => false,
+        }
+    }
+
+    pub fn owning(&self) -> Vec<TypeId> {
+        match self {
+            GroupType::FullOwning(a,b) => vec![*a,*b],
+            GroupType::PartialOwning(a, _) => vec![*a],
+            GroupType::NonOwning(_, _) => vec![],
+        }
+    }
+}
+
 /// A trait to make group dynamic, just like [ComponentStorage](crate::component::ComponentStorage)
 pub trait Group : Send + Sync{
     fn len(&self) -> usize;
-    fn type_id_a(&self) -> TypeId;
-    fn type_id_b(&self) -> TypeId;
-    fn owning_types(&self) -> Vec<TypeId>;
-
-    fn storage_a<'a>(&self,world : &'a World) -> RwLockReadGuard<'a,Box<dyn ComponentStorage>>{
-        world.raw_storage_read(self.type_id_a())
-            .expect("Group: Component was not registered in world")
-    }
-    fn storage_a_mut<'a>(&self,world : &'a World) ->RwLockWriteGuard<'a,Box<dyn ComponentStorage>>{
-        world.raw_storage_write(self.type_id_a())
-            .expect("Group: Component was not registered in world")
-    }
-    fn storage_b<'a>(&self,world : &'a World) -> RwLockReadGuard<'a,Box<dyn ComponentStorage>>{
-        world.raw_storage_read(self.type_id_b())
-            .expect("Group: Component was not registered in world")
-    }
-    fn storage_b_mut<'a>(&self,world : &'a World) -> RwLockWriteGuard<'a,Box<dyn ComponentStorage>>{
-        world.raw_storage_write(self.type_id_b())
-            .expect("Group: Component was not registered in world")
-    }
+    fn group_type(&self) -> GroupType;
 
     /// Check if entity exist in both component storages
     fn in_components(&self,
@@ -67,10 +83,54 @@ pub trait Group : Send + Sync{
                 id : EntityId,
                 comp_a : &Box<dyn ComponentStorage>,
                 comp_b : &Box<dyn ComponentStorage>) -> bool;
-    fn add(&mut self,world : &World,id : EntityId);
-    fn remove(&mut self,world : &World,id : EntityId);
+}
 
-    fn make_group_in_world(&mut self,world : &World);
+pub(in crate) trait FullOwningGroup : Group{
+    fn add(&mut self,
+           id : EntityId,
+           comp_a : &mut Box<dyn ComponentStorage>,
+           comp_b : &mut Box<dyn ComponentStorage>);
+
+    fn remove(&mut self,
+              id : EntityId,
+              comp_a : &mut Box<dyn ComponentStorage>,
+              comp_b : &mut Box<dyn ComponentStorage>);
+
+    fn make(&mut self,
+            comp_a : &mut Box<dyn ComponentStorage>,
+            comp_b : &mut Box<dyn ComponentStorage>);
+}
+   
+pub(in crate) trait PartialOwningGroup : Group{
+    fn add(&mut self,
+           id : EntityId,
+           comp_a : &mut Box<dyn ComponentStorage>,
+           comp_b : &Box<dyn ComponentStorage>);
+
+    fn remove(&mut self,
+              id : EntityId,
+              comp_a : &mut Box<dyn ComponentStorage>,
+              comp_b : &Box<dyn ComponentStorage>);
+
+    fn make(&mut self,
+            comp_a : &mut Box<dyn ComponentStorage>,
+            comp_b : &Box<dyn ComponentStorage>);
+}
+
+pub(in crate) trait NonOwningGroup : Group{
+    fn add(&mut self,
+           id : EntityId,
+           comp_a : &Box<dyn ComponentStorage>,
+           comp_b : &Box<dyn ComponentStorage>);
+
+    fn remove(&mut self,
+              id : EntityId,
+              comp_a : &Box<dyn ComponentStorage>,
+              comp_b : &Box<dyn ComponentStorage>);
+
+    fn make(&mut self,
+            comp_a : &Box<dyn ComponentStorage>,
+            comp_b : &Box<dyn ComponentStorage>);
 }
 
 impl dyn 'static + Group{
@@ -78,6 +138,25 @@ impl dyn 'static + Group{
         &*(self as *const dyn Group as *const T)
     }
 }
+
+impl dyn Group {
+    // Safety:
+    // Safe only self impl FullOwningGroup trait
+    pub(in crate) unsafe fn downcast_full_owning(&mut self) -> &mut dyn FullOwningGroup {
+        transmute(self)
+    }
+    // Safety:
+    // Safe only self impl FullOwningGroup trait
+    pub(in crate) unsafe fn downcast_partial_owning(&mut self) -> &mut dyn PartialOwningGroup {
+        transmute(self)
+    }
+    // Safety:
+    // Safe only self impl FullOwningGroup trait
+    pub(in crate) unsafe fn downcast_non_owning(&mut self) -> &mut dyn NonOwningGroup{
+        transmute(self)
+    }
+}
+
 
 /// A useful function to create FullOwning group
 pub fn full_owning<A : Component,B : Component>() -> FullOwning<A,B> {

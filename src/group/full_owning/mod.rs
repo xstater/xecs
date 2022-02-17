@@ -1,6 +1,6 @@
 use std::{any::TypeId, marker::PhantomData};
-use crate::{component::{Component, ComponentStorage}, entity::EntityId, world::World};
-use super::Group;
+use crate::{component::{Component, ComponentStorage}, entity::EntityId};
+use super::{FullOwningGroup, Group, GroupType};
 
 mod query;
 
@@ -32,16 +32,10 @@ impl<A : Component,B : Component> Group for FullOwning<A,B> {
         self.length
     }
 
-    fn type_id_a(&self) -> TypeId {
-        TypeId::of::<A>()
-    }
-
-    fn type_id_b(&self) -> TypeId {
-        TypeId::of::<B>()
-    }
-
-    fn owning_types(&self) -> Vec<TypeId> {
-        vec![self.type_id_a(),self.type_id_b()]
+    fn group_type(&self) -> GroupType {
+        GroupType::FullOwning(
+            TypeId::of::<A>(),
+            TypeId::of::<B>())
     }
 
     fn in_group(&self,
@@ -62,11 +56,13 @@ impl<A : Component,B : Component> Group for FullOwning<A,B> {
             false
         }
     }
+}
 
-    fn add(&mut self, world : &World, id : EntityId) {
-        let mut comp_a = self.storage_a_mut(world);
-        let mut comp_b = self.storage_b_mut(world);
-
+impl<A : Component,B : Component> FullOwningGroup for FullOwning<A,B> {
+    fn add(&mut self,
+           id : EntityId,
+           comp_a : &mut Box<dyn ComponentStorage>,
+           comp_b : &mut Box<dyn ComponentStorage>) {
         if !self.in_components(id,&comp_a,&comp_b) {
             return;
         }
@@ -85,10 +81,10 @@ impl<A : Component,B : Component> Group for FullOwning<A,B> {
         self.length += 1;
     }
 
-    fn remove(&mut self, world : &World, id : EntityId) {
-        let mut comp_a = self.storage_a_mut(world);
-        let mut comp_b = self.storage_b_mut(world);
-
+    fn remove(&mut self,
+              id : EntityId,
+              comp_a : &mut Box<dyn ComponentStorage>,
+              comp_b : &mut Box<dyn ComponentStorage>) {
         if !self.in_group(id,&comp_a,&comp_b) {
             return;
         }
@@ -104,11 +100,10 @@ impl<A : Component,B : Component> Group for FullOwning<A,B> {
         comp_b.swap_by_index(index_b,self.length);
     }
 
-    fn make_group_in_world(&mut self, world : &World) {
+    fn make(&mut self,
+            comp_a : &mut Box<dyn ComponentStorage>,
+            comp_b : &mut Box<dyn ComponentStorage>) {
         self.length = 0;
-
-        let mut comp_a = self.storage_a_mut(world);
-        let mut comp_b = self.storage_b_mut(world);
 
         let len_a = comp_a.count();
         let len_b = comp_b.count();
@@ -137,6 +132,4 @@ impl<A : Component,B : Component> Group for FullOwning<A,B> {
                 }
         }
     }
-
 }
-

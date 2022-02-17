@@ -1,6 +1,6 @@
 use std::{any::TypeId, marker::PhantomData};
-use crate::{component::{Component, ComponentStorage}, entity::EntityId, world::World};
-use super::Group;
+use crate::{component::{Component, ComponentStorage}, entity::EntityId};
+use super::{Group, GroupType, PartialOwningGroup};
 
 mod query;
 
@@ -26,16 +26,10 @@ impl<A : Component,B : Component> Group for PartialOwning<A,B> {
         self.length
     }
 
-    fn type_id_a(&self) -> std::any::TypeId {
-        TypeId::of::<A>()
-    }
-
-    fn type_id_b(&self) -> TypeId {
-        TypeId::of::<B>()
-    }
-
-    fn owning_types(&self) -> Vec<TypeId> {
-        vec![self.type_id_a()]
+    fn group_type(&self) -> GroupType {
+        GroupType::PartialOwning(
+            TypeId::of::<A>(),
+            TypeId::of::<B>())
     }
 
     fn in_group(&self,
@@ -56,11 +50,13 @@ impl<A : Component,B : Component> Group for PartialOwning<A,B> {
             false
         }
     }
+}
 
-    fn add(&mut self, world : &World, id : EntityId) {
-        let mut comp_a = self.storage_a_mut(world);
-        let comp_b = self.storage_b(world);
-
+impl<A : Component,B : Component> PartialOwningGroup for PartialOwning<A,B> {
+    fn add(&mut self,
+           id : EntityId,
+           comp_a : &mut Box<dyn ComponentStorage>,
+           comp_b : &Box<dyn ComponentStorage>) {
         if !self.in_components(id,&comp_a,&comp_b) {
             return;
         }
@@ -77,10 +73,10 @@ impl<A : Component,B : Component> Group for PartialOwning<A,B> {
         self.length += 1;
     }
 
-    fn remove(&mut self, world : &World, id : EntityId) {
-        let mut comp_a = self.storage_a_mut(world);
-        let comp_b = self.storage_b(world);
-
+    fn remove(&mut self,
+              id : EntityId,
+              comp_a : &mut Box<dyn ComponentStorage>,
+              comp_b : &Box<dyn ComponentStorage>) {
         if !self.in_group(id,&comp_a,&comp_b) {
             return;
         }
@@ -94,11 +90,10 @@ impl<A : Component,B : Component> Group for PartialOwning<A,B> {
         comp_a.swap_by_index(index_a,self.length);
     }
 
-    fn make_group_in_world(&mut self, world : &World) {
+    fn make(&mut self,
+            comp_a : &mut Box<dyn ComponentStorage>,
+            comp_b : &Box<dyn ComponentStorage>) {
         self.length = 0;
-
-        let mut comp_a = self.storage_a_mut(world);
-        let comp_b = self.storage_b(world);
 
         for index in 0..comp_a.count() {
             // Unwrap will never fail

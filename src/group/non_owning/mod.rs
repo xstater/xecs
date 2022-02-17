@@ -1,6 +1,6 @@
 use std::{any::TypeId, marker::PhantomData};
-use crate::{component::{Component, ComponentStorage}, entity::EntityId, sparse_set::SparseSet, world::World};
-use super::Group;
+use crate::{component::{Component, ComponentStorage}, entity::EntityId, sparse_set::SparseSet};
+use super::{Group, GroupType, NonOwningGroup};
 
 mod query;
 pub use query::{
@@ -31,16 +31,10 @@ impl<A : Component,B : Component> Group for NonOwning<A,B> {
         self.sparse_set.len()
     }
 
-    fn type_id_a(&self) -> std::any::TypeId {
-        TypeId::of::<A>()
-    }
-
-    fn type_id_b(&self) -> TypeId {
-        TypeId::of::<B>()
-    }
-
-    fn owning_types(&self) -> Vec<TypeId> {
-        vec![]
+    fn group_type(&self) -> GroupType {
+        GroupType::NonOwning(
+            TypeId::of::<A>(),
+            TypeId::of::<B>())
     }
 
     fn in_group(&self,
@@ -53,11 +47,14 @@ impl<A : Component,B : Component> Group for NonOwning<A,B> {
 
         self.sparse_set.exist(id)
     }
+}
 
-    fn add(&mut self, world : &World, id : EntityId) {
-        let comp_a = self.storage_a(world);
-        let comp_b = self.storage_b(world);
 
+impl<A : Component,B : Component> NonOwningGroup for NonOwning<A,B> {
+    fn add(&mut self,
+           id : EntityId,
+           comp_a : &Box<dyn ComponentStorage>,
+           comp_b : &Box<dyn ComponentStorage>) {
         if !self.in_components(id,&comp_a,&comp_b) {
             return;
         }
@@ -73,10 +70,10 @@ impl<A : Component,B : Component> Group for NonOwning<A,B> {
         self.sparse_set.add(id,(index_a,index_b));
     }
 
-    fn remove(&mut self, world : &World, id : EntityId) {
-        let comp_a = self.storage_a(world);
-        let comp_b = self.storage_b(world);
-
+    fn remove(&mut self,
+              id : EntityId,
+              comp_a : &Box<dyn ComponentStorage>,
+              comp_b : &Box<dyn ComponentStorage>) {
         if !self.in_group(id,&comp_a,&comp_b) {
             return;
         }
@@ -86,11 +83,10 @@ impl<A : Component,B : Component> Group for NonOwning<A,B> {
         self.sparse_set.remove(id).unwrap();
     }
 
-    fn make_group_in_world(&mut self, world : &World) {
+    fn make(&mut self,
+            comp_a : &Box<dyn ComponentStorage>,
+            comp_b : &Box<dyn ComponentStorage>) {
         self.sparse_set.clear();
-
-        let comp_a = self.storage_a(world);
-        let comp_b = self.storage_b(world);
 
         let len_a = comp_a.count();
         let len_b = comp_b.count();
