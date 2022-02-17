@@ -1,5 +1,4 @@
 use std::{ops::{Deref, DerefMut}, sync::{RwLockReadGuard, RwLockWriteGuard}};
-
 use crate::{entity::EntityId, sparse_set::SparseSet};
 
 /// The Component trait  
