@@ -5,80 +5,56 @@
 //! be ```Send + Sync```.Therefore,the all other states of world can be guarded
 //! by [RwLock](std::sync::RwLock).So we can use world in concurrency environment by ```RwLock<World>```.
 use crate::component::{Component, StorageRead, ComponentStorage, StorageWrite};
-use crate::entity::{EntityBuilder, EntityId, EntityManager};
-use crate::group::Group;
+use crate::entity::{Entity, EntityId, EntityManager};
+use crate::group::{Group, GroupType};
 use crate::query::{QueryIterator, Queryable};
-use crate::resource::{ResourceRead, ResourceWrite};
+use crate::resource::{Resource, ResourceRead, ResourceWrite};
 use crate::sparse_set::SparseSet;
-use std::any::{Any, TypeId};
+use std::any::TypeId;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// World is the core of XECS.It manages all components and entities
 pub struct World {
-    entity_manager: EntityManager,
+    entity_manager: RwLock<EntityManager>,
     // Box<SparseSet<EntityId,Component>>
     components: HashMap<TypeId,RwLock<Box<dyn ComponentStorage>>>,
     groups: Vec<RwLock<Box<dyn Group>>>,
-    resources : HashMap<TypeId,RwLock<Option<Box<dyn Any + Send + Sync>>>>
+    resources : HashMap<TypeId,RwLock<Box<dyn Resource>>>
 }
 
 impl World {
     /// Create a empty world.
     pub fn new() -> World {
         World {
-            entity_manager: EntityManager::new(),
+            entity_manager: RwLock::new(EntityManager::new()),
             components: Default::default(),
             groups: Default::default(),
             resources : Default::default()
         }
     }
 
-    /// Store resource in world 
-    pub fn store_resource<R : 'static + Send + Sync>(&mut self,resource : R) {
+    /// Register resource in world 
+    pub fn register_resource<R : Resource>(&mut self,resource : R) {
         let type_id = TypeId::of::<R>();
-        if !self.resources.contains_key(&type_id) {
-            self.resources.insert(type_id,RwLock::new(Option::None));
-        }
-        self.resources.get(&type_id).unwrap() //This never fails
-            .write().unwrap()
-            .replace(Box::new(resource));
-    }
-
-    /// Fetch resource from world
-    pub fn fetch_resource<R : 'static + Send + Sync>(&mut self) -> Option<R> {
-        let type_id = TypeId::of::<R>();
-        let res = self.resources.get(&type_id)?
-            .write().unwrap()
-            .take()?;
-        // This never fails
-        // because the type_id was checked before
-        Some(*res.downcast::<R>().unwrap())
+        self.resources.insert(type_id,RwLock::new(Box::new(resource)));
     }
 
     /// Get a read guard of resource
-    pub fn resource_ref<R : 'static + Send + Sync>(&self) -> Option<ResourceRead<'_,R>> {
+    pub fn resource_read<R : Resource>(&self) -> Option<ResourceRead<'_,R>> {
         let type_id = TypeId::of::<R>();
         let lock = self.resources.get(&type_id)?
             .read().unwrap();
-        if lock.is_none() {
-            Option::None
-        } else {
-            Some(ResourceRead::from_read(lock))
-        }
+        Some(ResourceRead::new(lock))
     }
 
     /// Get a write guard of resource
-    pub fn resource_mut<R : 'static + Send + Sync>(&self) -> Option<ResourceWrite<'_,R>> {
+    pub fn resource_write<R : Resource>(&self) -> Option<ResourceWrite<'_,R>> {
         let type_id = TypeId::of::<R>();
         let lock = self.resources.get(&type_id)?
             .write().unwrap();
-        if lock.is_none() {
-            Option::None
-        } else {
-            Some(ResourceWrite::from_write(lock))
-        }
+        Some(ResourceWrite::new(lock))
     }
 
     /// Register a component.
@@ -103,27 +79,79 @@ impl World {
 
     /// Create an entity without any component in World,
     ///  return an [EntityBuilder](crate::entity::EntityBuilder).
-    pub fn create_entity(&mut self) -> EntityBuilder<'_> {
-        let id = self.entity_manager.create();
-        EntityBuilder::new(self, id)
+    pub fn create_entity(&self) -> Entity<'_> {
+        let id = {
+            let mut entity_manager = self.entity_manager.write().unwrap();
+            entity_manager.create()
+        };
+        Entity::new(self, id)
     }
 
     /// Remove entity and its components.
-    pub fn remove_entity(&mut self, entity_id: EntityId) {
+    pub fn remove_entity(&self, entity_id: EntityId) {
         assert!(self.exist(entity_id),
                 "World:Cannot remove a non-exists entity");
-        self.entity_manager.remove(entity_id);
-        // remove entity in group
-        for group in &self.groups {
-            let mut group = group.write().unwrap();
-            group.remove(self, entity_id);
+        // remove entity from manager
+        {
+            let mut entity_manager = self.entity_manager.write().unwrap();
+            entity_manager.remove(entity_id);
         }
-        // remove all components of this entity
-        for (_, storage) in &mut self.components {
-            let mut storage = storage.write().unwrap();
-            if storage.has(entity_id) {
-                storage.remove(entity_id);
+        // find all groups need remove 
+        let mut groups = vec![];
+        for group in &self.groups {
+            let need_remove = {
+                let group = group.read().unwrap();
+                let (type_a,type_b) = group.group_type().types();
+                let comp_a = self.raw_storage_read(type_a).unwrap();
+                let comp_b = self.raw_storage_read(type_b).unwrap();
+                group.in_group(entity_id, &comp_a, &comp_b)
+            };
+            if need_remove {
+                groups.push(group.write().unwrap());
+            };
+        }
+        // remove entity in group and its storages
+        for mut group in groups {
+            match group.group_type() {
+                GroupType::FullOwning(type_a,type_b) => {
+                    let mut comp_a = self.raw_storage_write(type_a).unwrap();
+                    let mut comp_b = self.raw_storage_write(type_b).unwrap();
+                    unsafe {
+                        group.downcast_full_owning()
+                    }.remove(entity_id,&mut comp_a,&mut comp_b);
+                    comp_a.remove(entity_id);
+                    comp_b.remove(entity_id);
+                },
+                GroupType::PartialOwning(type_a,type_b) => {
+                    let mut comp_a = self.raw_storage_write(type_a).unwrap();
+                    let comp_b = self.raw_storage_read(type_b).unwrap();
+                    unsafe {
+                        group.downcast_partial_owning()
+                    }.remove(entity_id,&mut comp_a,&comp_b);
+                    comp_a.remove(entity_id);
+                }
+                GroupType::NonOwning(type_a,type_b) => {
+                    let comp_a = self.raw_storage_read(type_a).unwrap();
+                    let comp_b = self.raw_storage_read(type_b).unwrap();
+                    unsafe {
+                        group.downcast_non_owning()
+                    }.remove(entity_id,&comp_a,&comp_b);
+                },
             }
+        }
+        // remove entity in other storages
+        let mut storages = vec![];
+        for storage in self.components.values() {
+            let need_remove = {
+                let storage = storage.read().unwrap();
+                storage.has(entity_id)
+            };
+            if need_remove {
+                storages.push(storage.write().unwrap());
+            }
+        }
+        for mut storage in storages {
+            storage.remove(entity_id);
         }
     }
 
@@ -149,7 +177,7 @@ impl World {
     /// # Panics
     /// * Panic if ```T``` is not registered.
     /// * Panic if ```entity_id``` not exist.
-    pub fn attach_component<T: Component>(&mut self, entity_id: EntityId,component: T) {
+    pub fn attach_component<T: Component>(&self, entity_id: EntityId,component: T) {
         assert!(self.has_registered::<T>(),
                 "World:Cannot attach component because components has not been registered.");
         assert!(self.exist(entity_id),
@@ -165,10 +193,40 @@ impl World {
             };
             sparse_set.add(entity_id,component);
         }
+        let mut groups = vec![];
         for group in &self.groups {
-            let mut group = group.write().unwrap();
-            if group.type_id_a() == type_id || group.type_id_b() == type_id {
-                group.add(self, entity_id);
+            let need_add = {
+                let group = group.read().unwrap();
+                let (type_id_a,type_id_b) = group.group_type().types();
+                type_id_a == type_id || type_id_b == type_id
+            };
+            if need_add {
+                groups.push(group.write().unwrap())
+            }
+        }
+        for mut group in groups {
+            match group.group_type() {
+                GroupType::FullOwning(type_a,type_b) => {
+                    let mut comp_a = self.raw_storage_write(type_a).unwrap();
+                    let mut comp_b = self.raw_storage_write(type_b).unwrap();
+                    unsafe {
+                        group.downcast_full_owning()
+                    }.add(entity_id,&mut comp_a,&mut comp_b);
+                },
+                GroupType::PartialOwning(type_a,type_b) => {
+                    let mut comp_a = self.raw_storage_write(type_a).unwrap();
+                    let comp_b = self.raw_storage_read(type_b).unwrap();
+                    unsafe {
+                        group.downcast_partial_owning()
+                    }.add(entity_id,&mut comp_a,&comp_b);
+                },
+                GroupType::NonOwning(type_a,type_b) => {
+                    let comp_a = self.raw_storage_read(type_a).unwrap();
+                    let comp_b = self.raw_storage_read(type_b).unwrap();
+                    unsafe {
+                        group.downcast_non_owning()
+                    }.add(entity_id,&comp_a,&comp_b);
+                }
             }
         }
     }
@@ -180,18 +238,49 @@ impl World {
     /// # Panics
     /// * Panic if ```T``` is not registered.
     /// * Panic if ```entity_id``` not exist.
-    pub fn detach_component<T: Component>(&mut self, entity_id: EntityId) -> Option<T> {
+    pub fn detach_component<T: Component>(&self, entity_id: EntityId) -> Option<T> {
         assert!(self.has_registered::<T>(),
                 "World:Cannot detach component because components has not been registered.");
         assert!(self.exist(entity_id),
                 "World:Cannot detach component from a non-exist entity");
         let type_id = TypeId::of::<T>();
+        let mut groups = vec![];
         for group in &self.groups {
-            let mut group = group.write().unwrap();
-            if group.type_id_a() == type_id || group.type_id_b() == type_id {
-                group.remove(self, entity_id)
+            let need_remove = {
+                let group = group.read().unwrap();
+                let (type_id_a,type_id_b) = group.group_type().types();
+                type_id_a == type_id || type_id_b == type_id
+            };
+            if need_remove {
+                groups.push(group.write().unwrap())
             }
         }
+        for mut group in groups {
+            match group.group_type() {
+                GroupType::FullOwning(type_a,type_b) => {
+                    let mut comp_a = self.raw_storage_write(type_a).unwrap();
+                    let mut comp_b = self.raw_storage_write(type_b).unwrap();
+                    unsafe {
+                        group.downcast_full_owning()
+                    }.remove(entity_id,&mut comp_a,&mut comp_b);
+                },
+                GroupType::PartialOwning(type_a,type_b) => {
+                    let mut comp_a = self.raw_storage_write(type_a).unwrap();
+                    let comp_b = self.raw_storage_read(type_b).unwrap();
+                    unsafe {
+                        group.downcast_partial_owning()
+                    }.remove(entity_id,&mut comp_a,&comp_b);
+                },
+                GroupType::NonOwning(type_a,type_b) => {
+                    let comp_a = self.raw_storage_read(type_a).unwrap();
+                    let comp_b = self.raw_storage_read(type_b).unwrap();
+                    unsafe {
+                        group.downcast_non_owning()
+                    }.remove(entity_id,&comp_a,&comp_b);
+                }
+            }
+        }
+
         // Unwrap never fails because assert ensures this
         let mut storage = self.raw_storage_write(type_id).unwrap();
         // SAFTY:
@@ -204,12 +293,8 @@ impl World {
 
     /// Check if ```entity_id``` exists in World.
     pub fn exist(&self, entity_id: EntityId) -> bool {
-        self.entity_manager.has(entity_id)
-    }
-
-    /// Get ids of all the entites.
-    pub fn entities(&self) -> &[EntityId] {
-        self.entity_manager.entities()
+        let entity_manager = self.entity_manager.read().unwrap();
+        entity_manager.has(entity_id)
     }
 
     /// Get the component storage's read guard
@@ -238,12 +323,10 @@ impl World {
                 let mut ok = true;
                 'outer: for world_group in &self.groups {
                     let world_group = world_group.read().unwrap();
-                    for world_group_owning in &world_group.owning_types() {
-                        for owning in &group.owning_types() {
-                            if *owning == *world_group_owning {
-                                ok = false;
-                                break 'outer;
-                            }
+                    for owning_type in world_group.group_type().owning() {
+                        if group.group_type().owned(owning_type) {
+                            ok = false;
+                            break 'outer;
                         }
                     }
                 }
@@ -252,34 +335,52 @@ impl World {
             "World: Cannot make group because component was owned by another group"
         );
 
-        let mut group = group;
-        group.make_group_in_world(&self);
         self.groups.push(RwLock::new(Box::new(group)));
+        let group = self.groups.last().unwrap();
+        let mut group = group.write().unwrap();
+        match group.group_type() {
+            GroupType::FullOwning(type_a,type_b) => {
+                let mut comp_a = self.raw_storage_write(type_a).unwrap();
+                let mut comp_b = self.raw_storage_write(type_b).unwrap();
+                unsafe {
+                    group.downcast_full_owning()
+                }.make(&mut comp_a,&mut comp_b);
+            },
+            GroupType::PartialOwning(type_a,type_b) => {
+                let mut comp_a = self.raw_storage_write(type_a).unwrap();
+                let comp_b = self.raw_storage_read(type_b).unwrap();
+                unsafe {
+                    group.downcast_partial_owning()
+                }.make(&mut comp_a,&comp_b);
+            },
+            GroupType::NonOwning(type_a,type_b) => {
+                let comp_a = self.raw_storage_read(type_a).unwrap();
+                let comp_b = self.raw_storage_read(type_b).unwrap();
+                unsafe {
+                    group.downcast_non_owning()
+                }.make(&comp_a,&comp_b);
+            },
+        }
     }
 
     /// Check if (group)[crate::group] exists in [World](crate::world::World).
     /// Return true if group is same as another group in World.
-    pub fn has_group<G: Group + 'static>(&self, group: &G) -> bool {
+    pub(in crate) fn has_group<G: Group + 'static>(&self, group: &G) -> bool {
         for world_group in &self.groups {
             let world_group = world_group.read().unwrap();
-            if group.type_id_a() == world_group.type_id_a()
-                && group.type_id_b() == world_group.type_id_b()
-                && group.owning_types() == world_group.owning_types()
-            {
+            if world_group.group_type() == group.group_type() {
                 return true;
             }
         }
         false
     }
 
-    pub(in crate) fn group<G: Group + 'static>(&self, group: &G) ->RwLockReadGuard<Box<dyn Group>> {
+    pub(in crate) fn group<G: Group + 'static>(&self, group: &G) -> RwLockReadGuard<Box<dyn Group>> {
         self.groups
             .iter()
             .find(|world_group| {
                 let world_group = world_group.read().unwrap();
-                group.type_id_a() == world_group.type_id_a()
-                    && group.type_id_b() == world_group.type_id_b()
-                    && group.owning_types() == world_group.owning_types()
+                world_group.group_type() == group.group_type()
             })
             // unwrap here
             // existence will be ensured by an outside function
@@ -321,9 +422,9 @@ mod tests {
     fn component_test() {
         let mut world = World::new();
         world.register::<char>();
-        let id1 = world.create_entity().into_id();
-        let id2 = world.create_entity().into_id();
-        let _id3 = world.create_entity().into_id();
+        let id1 = world.create_entity().id();
+        let id2 = world.create_entity().id();
+        let _id3 = world.create_entity().id();
 
         world.attach_component(id1, 'c');
         world.attach_component(id2, 'a');
@@ -361,17 +462,17 @@ mod tests {
         }
 
         world.create_entity().attach(1u32).attach(());
-        let id2 = world.create_entity().attach(2u32).into_id();
+        let id2 = world.create_entity().attach(2u32).id();
         let id3 = world
             .create_entity()
             .attach(3u32)
             .attach('a')
             .attach(())
-            .into_id();
+            .id();
         world.create_entity().attach(4u32).attach('b');
         world.create_entity().attach(5u32).attach('c');
         world.create_entity().attach(6u32);
-        let id7 = world.create_entity().attach('d').attach(()).into_id();
+        let id7 = world.create_entity().attach('d').attach(()).id();
         println!("#initial");
         print::<u32>(&world, "u32 :");
         print::<char>(&world, "char:");
@@ -436,23 +537,18 @@ mod tests {
             age : u32
         }
         
-        world.store_resource(Test{
+        world.register_resource(Test{
             name : "affff".to_string(),
             age : 12
         });
 
-        assert!(world.resource_ref::<Test>().is_some());
-        assert_eq!(world.resource_ref::<Test>().unwrap().age,12);
+        assert!(world.resource_read::<Test>().is_some());
+        assert_eq!(world.resource_read::<Test>().unwrap().age,12);
 
-        world.resource_mut::<Test>().unwrap().age = 13;
+        world.resource_write::<Test>().unwrap().age = 13;
 
-        assert_eq!(world.resource_ref::<Test>().unwrap().age,13);
-
-        let test = world.fetch_resource::<Test>().unwrap();
-
-        assert_eq!(test.age,13);
-        assert_eq!(test.name.as_str(),"affff");
-
+        assert_eq!(world.resource_read::<Test>().unwrap().age,13);
+        assert_eq!(&world.resource_read::<Test>().unwrap().name,"affff");
     }
 
 }
