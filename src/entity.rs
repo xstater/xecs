@@ -9,30 +9,29 @@
 //! next ```world.create_entity()``` is called, it will allocate this ID to fill 
 //! the pit.Thanks to sparse set, it's still fast to 
 //! iterate all components no matter how random of ID
-use std::num::NonZeroUsize;
-use crate::component::Component;
-use crate::world::World;
+use std::{num::NonZeroUsize, sync::RwLockReadGuard};
+use crate::{component::Component, world::World};
 
 /// The type of ID of entity which starts from 1 and can be recycled automatically
 pub type EntityId = NonZeroUsize;
 
 /// A useful struct for building a entity
-#[derive(Debug)]
-pub struct EntityBuilder<'a>{
-    world : &'a mut World,
+// #[derive(Debug)]
+pub struct Entity<'a>{
+    world : &'a World,
     id : EntityId,
 }
 
-impl<'a> EntityBuilder<'a>{
-    pub(in crate) fn new(world : &'a mut World,entity_id : EntityId) -> Self{
-        EntityBuilder{
+impl<'a> Entity<'a>{
+    pub(in crate) fn new(world : &'a World,entity_id : EntityId) -> Self{
+        Entity{
             world,
             id: entity_id,
         }
     }
 
-    /// Consume EntityRef and return a valid EntityId
-    pub fn into_id(self) -> EntityId{
+    /// Get entity id
+    pub fn id(&self) -> EntityId{
         self.id
     }
 
@@ -40,6 +39,11 @@ impl<'a> EntityBuilder<'a>{
     pub fn attach<T : Component>(self,component : T) -> Self{
         self.world.attach_component(self.id,component);
         self
+    }
+
+    /// Detach a component from entity
+    pub fn detach<T : Component>(self) -> Option<T> {
+        self.world.detach_component(self.id)
     }
 
 }
