@@ -13,10 +13,7 @@ use crate::sparse_set::SparseSet;
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-#[cfg(not(features = "deadlocks"))]
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-#[cfg(features = "deadlocks")]
-use no_deadlocks::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// World is the core of XECS.It manages all components and entities
 pub struct World {
@@ -94,11 +91,6 @@ impl World {
     pub fn remove_entity(&self, entity_id: EntityId) {
         assert!(self.exist(entity_id),
                 "World:Cannot remove a non-exists entity");
-        // remove entity from manager
-        {
-            let mut entity_manager = self.entity_manager.write().unwrap();
-            entity_manager.remove(entity_id);
-        }
         // find all groups need remove 
         let mut groups = vec![];
         for group in &self.groups {
@@ -152,6 +144,11 @@ impl World {
         }
         for mut storage in storages {
             storage.remove(entity_id);
+        }
+        // remove entity from manager
+        {
+            let mut entity_manager = self.entity_manager.write().unwrap();
+            entity_manager.remove(entity_id);
         }
     }
 
@@ -332,7 +329,7 @@ impl World {
     /// Get an [Entity](crate::entity::Entity) from an entity id
     pub fn entity(&self,id : EntityId) -> Option<Entity<'_>> {
         let lock = self.entity_manager.read().unwrap();
-        if self.exist(id) {
+        if lock.has(id) {
             Some(Entity::new(&self, lock, id))
         } else {
             None
