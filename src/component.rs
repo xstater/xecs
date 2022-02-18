@@ -1,9 +1,6 @@
 use std::ops::{Deref, DerefMut};
 use crate::{entity::EntityId, sparse_set::SparseSet};
-#[cfg(not(features = "deadlocks"))]
 use std::sync::{RwLockReadGuard, RwLockWriteGuard};
-#[cfg(features = "deadlocks")]
-use no_deadlocks::{RwLockReadGuard, RwLockWriteGuard};
 
 /// The Component trait  
 pub trait Component : Send + Sync + 'static {}

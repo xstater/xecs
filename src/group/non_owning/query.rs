@@ -1,10 +1,7 @@
 use std::any::TypeId;
 use crate::{component::{Component, ComponentStorage}, entity::EntityId, group::{Group, non_owning}, query::{QueryIterator, Queryable}, sparse_set::SparseSet, world::World};
 use super::NonOwning;
-#[cfg(not(features = "deadlocks"))]
 use std::sync::{RwLockReadGuard, RwLockWriteGuard};
-#[cfg(features = "deadlocks")]
-use no_deadlocks::{RwLockReadGuard, RwLockWriteGuard};
 
 pub struct IterRefRef<'a,A,B> {
     index: usize,

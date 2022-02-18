@@ -11,10 +11,7 @@
 //! iterate all components no matter how random of ID
 use std::num::NonZeroUsize;
 use crate::{component::{Component, ComponentRead, ComponentWrite}, world::World};
-#[cfg(not(features = "deadlocks"))]
 use std::sync::RwLockReadGuard;
-#[cfg(features = "deadlocks")]
-use no_deadlocks::RwLockReadGuard;
 
 /// The type of ID of entity which starts from 1 and can be recycled automatically
 pub type EntityId = NonZeroUsize;
