@@ -9,8 +9,8 @@
 //! next ```world.create_entity()``` is called, it will allocate this ID to fill 
 //! the pit.Thanks to sparse set, it's still fast to 
 //! iterate all components no matter how random of ID
-use std::num::NonZeroUsize;
-use crate::{component::Component, world::World};
+use std::{num::NonZeroUsize, sync::RwLockReadGuard};
+use crate::{component::{Component, ComponentRead, ComponentWrite}, world::World};
 
 /// The type of ID of entity which starts from 1 and can be recycled automatically
 pub type EntityId = NonZeroUsize;
@@ -20,13 +20,20 @@ pub type EntityId = NonZeroUsize;
 pub struct Entity<'a>{
     world : &'a World,
     id : EntityId,
+    // To avoid remove this ID from world
+    // The ID must be valid during Entity is alive
+    #[allow(unused)]
+    borrow_entity_manager : RwLockReadGuard<'a,EntityManager>
 }
 
 impl<'a> Entity<'a>{
-    pub(in crate) fn new(world : &'a World,entity_id : EntityId) -> Self{
+    pub(in crate) fn new(world : &'a World,
+                         borrow_entity_manager : RwLockReadGuard<'a,EntityManager>,
+                         entity_id : EntityId) -> Self{
         Entity{
             world,
             id: entity_id,
+            borrow_entity_manager,
         }
     }
 
@@ -36,16 +43,25 @@ impl<'a> Entity<'a>{
     }
 
     /// Attach a component to entity
-    pub fn attach<T : Component>(self,component : T) -> Self{
+    pub fn attach<T : Component>(&self,component : T) -> &Self{
         self.world.attach_component(self.id,component);
         self
     }
 
     /// Detach a component from entity
-    pub fn detach<T : Component>(self) -> Option<T> {
+    pub fn detach<T : Component>(&self) -> Option<T> {
         self.world.detach_component(self.id)
     }
 
+    /// Read component of this entity
+    pub fn component_read<T : Component>(&self) -> Option<ComponentRead<'_,T>> {
+        self.world.entity_component_read(self.id)
+    }
+
+    /// Write component of this entity
+    pub fn component_write<T : Component>(&self) -> Option<ComponentWrite<'_,T>> {
+        self.world.entity_component_write(self.id)
+    }
 }
 
 #[derive(Debug,Copy,Clone)]
@@ -185,4 +201,5 @@ mod tests{
         println!("entities :{:?}",manager.entities.as_slice());
         println!();
     }
+    
 }

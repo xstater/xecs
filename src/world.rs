@@ -4,7 +4,7 @@
 //! ensure the borrow check relations of all components.And [World](crate::world::World) can also
 //! be ```Send + Sync```.Therefore,the all other states of world can be guarded
 //! by [RwLock](std::sync::RwLock).So we can use world in concurrency environment by ```RwLock<World>```.
-use crate::component::{Component, StorageRead, ComponentStorage, StorageWrite};
+use crate::component::{Component, ComponentRead, ComponentStorage, ComponentWrite, StorageRead, StorageWrite};
 use crate::entity::{Entity, EntityId, EntityManager};
 use crate::group::Group;
 use crate::query::{QueryIterator, Queryable};
@@ -84,7 +84,7 @@ impl World {
             let mut entity_manager = self.entity_manager.write().unwrap();
             entity_manager.create()
         };
-        Entity::new(self, id)
+        self.entity(id).unwrap()
     }
 
     /// Remove entity and its components.
@@ -300,6 +300,40 @@ impl World {
         let type_id = TypeId::of::<T>();
         let lock = self.raw_storage_write(type_id)?;
         Some(StorageWrite::from_lock(lock))
+    }
+
+    /// Get the read guard of component of an entity
+    pub fn entity_component_read<T : Component>(&self,id : EntityId) -> Option<ComponentRead<'_,T>> {
+        let lock = self.components_read::<T>()?;
+        if lock.exist(id) {
+            Some(unsafe {
+                ComponentRead::new(id,lock)
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Get the write guard of component of an entity
+    pub fn entity_component_write<T : Component>(&self,id : EntityId) -> Option<ComponentWrite<'_,T>> {
+        let lock = self.components_write::<T>()?;
+        if lock.exist(id) {
+            Some(unsafe {
+                ComponentWrite::new(id,lock)
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Get an [Entity](crate::entity::Entity) from an entity id
+    pub fn entity(&self,id : EntityId) -> Option<Entity<'_>> {
+        let lock = self.entity_manager.read().unwrap();
+        if self.exist(id) {
+            Some(Entity::new(&self, lock, id))
+        } else {
+            None
+        }
     }
 
     /// Make a [group](crate::group) to accelerate the iteration.
@@ -546,4 +580,57 @@ mod tests {
         assert_eq!(&world.resource_read::<Test>().unwrap().name,"affff");
     }
 
+    #[test]
+    fn entity_component_test() {
+        let mut world = World::new();
+
+        world.register::<u32>();
+
+        world.create_entity().attach(5u32);
+        let id = world.create_entity().attach(7u32).id();
+        world.create_entity().attach(2u32);
+
+        {
+            let v = world.entity_component_read::<u32>(id).unwrap();
+            assert_eq!(*v,7u32);
+        }
+
+        {
+            let mut v = world.entity_component_write::<u32>(id).unwrap();
+            *v = 3u32;
+        }
+
+        {
+            let v = world.entity_component_read::<u32>(id).unwrap();
+            assert_eq!(*v,3u32);
+        }
+    }
+
+    #[test]
+    fn entity_test() {
+        let mut world = World::new();
+
+        world.register::<u32>();
+
+        world.create_entity().attach(5u32);
+        let id = world.create_entity().attach(7u32).id();
+        world.create_entity().attach(2u32);
+
+        let entity = world.entity(id).unwrap();
+
+        {
+            let v = entity.component_read::<u32>().unwrap();
+            assert_eq!(*v,7u32);
+        }
+
+        {
+            let mut v = entity.component_write::<u32>().unwrap();
+            *v = 3u32;
+        }
+
+        {
+            let v = entity.component_read::<u32>().unwrap();
+            assert_eq!(*v,3u32);
+        }
+    }
 }
