@@ -9,8 +9,12 @@
 //! next ```world.create_entity()``` is called, it will allocate this ID to fill 
 //! the pit.Thanks to sparse set, it's still fast to 
 //! iterate all components no matter how random of ID
-use std::{num::NonZeroUsize, sync::RwLockReadGuard};
+use std::num::NonZeroUsize;
 use crate::{component::{Component, ComponentRead, ComponentWrite}, world::World};
+#[cfg(not(features = "deadlocks"))]
+use std::sync::RwLockReadGuard;
+#[cfg(features = "deadlocks")]
+use no_deadlocks::RwLockReadGuard;
 
 /// The type of ID of entity which starts from 1 and can be recycled automatically
 pub type EntityId = NonZeroUsize;

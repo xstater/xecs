@@ -13,7 +13,10 @@ use crate::sparse_set::SparseSet;
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+#[cfg(not(features = "deadlocks"))]
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+#[cfg(features = "deadlocks")]
+use no_deadlocks::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// World is the core of XECS.It manages all components and entities
 pub struct World {

@@ -44,8 +44,12 @@
 //! is boxed by ```Box<dyn ComponentStorage>```. And the 
 //! ```sparse_set``` field's lifetime equals to borrow's ```'a```. 
 //! So the pointer is valid when this struct is alive.
-use std::{any::TypeId, sync::{RwLockReadGuard, RwLockWriteGuard}};
+use std::any::TypeId;
 use crate::{component::{Component, ComponentStorage}, entity::EntityId, sparse_set::SparseSet, world::World};
+#[cfg(not(features = "deadlocks"))]
+use std::sync::{RwLockReadGuard, RwLockWriteGuard};
+#[cfg(features = "deadlocks")]
+use no_deadlocks::{RwLockReadGuard, RwLockWriteGuard};
 
 mod with;
 mod without;

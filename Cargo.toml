@@ -1,6 +1,6 @@
 [package]
 name = "xecs"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["xstater:a166224@163.com"]
 edition = "2021"
 license = "MIT"
@@ -11,6 +11,11 @@ repository = "https://github.com/xstater/xecs/"
 keywords = ["gamedev","ecs","game-engine"]
 categories = ["game-development","game-engines"]
 
+[features]
+default = []
+deadlocks = []
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 futures = "0.3"
+no_deadlocks = "1.3"

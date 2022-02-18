@@ -1,4 +1,8 @@
-use std::{fmt::{Debug, Display}, marker::PhantomData, ops::{Deref, DerefMut}, sync::{RwLockReadGuard, RwLockWriteGuard}};
+use std::{fmt::{Debug, Display}, marker::PhantomData, ops::{Deref, DerefMut}};
+#[cfg(not(features = "deadlocks"))]
+use std::sync::{RwLockReadGuard, RwLockWriteGuard};
+#[cfg(features = "deadlocks")]
+use no_deadlocks::{RwLockReadGuard, RwLockWriteGuard};
 
 /// The resource trait 
 pub trait Resource : Send + Sync + 'static {}
