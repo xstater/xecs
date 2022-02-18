@@ -447,9 +447,9 @@ mod tests {
     fn component_test() {
         let mut world = World::new();
         world.register::<char>();
-        let id1 = world.create_entity().id();
-        let id2 = world.create_entity().id();
-        let _id3 = world.create_entity().id();
+        let id1 = world.create_entity().into_id();
+        let id2 = world.create_entity().into_id();
+        let _id3 = world.create_entity().into_id();
 
         world.attach_component(id1, 'c');
         world.attach_component(id2, 'a');
@@ -487,17 +487,17 @@ mod tests {
         }
 
         world.create_entity().attach(1u32).attach(());
-        let id2 = world.create_entity().attach(2u32).id();
+        let id2 = world.create_entity().attach(2u32).into_id();
         let id3 = world
             .create_entity()
             .attach(3u32)
             .attach('a')
             .attach(())
-            .id();
+            .into_id();
         world.create_entity().attach(4u32).attach('b');
         world.create_entity().attach(5u32).attach('c');
         world.create_entity().attach(6u32);
-        let id7 = world.create_entity().attach('d').attach(()).id();
+        let id7 = world.create_entity().attach('d').attach(()).into_id();
         println!("#initial");
         print::<u32>(&world, "u32 :");
         print::<char>(&world, "char:");
@@ -587,7 +587,7 @@ mod tests {
         world.register::<u32>();
 
         world.create_entity().attach(5u32);
-        let id = world.create_entity().attach(7u32).id();
+        let id = world.create_entity().attach(7u32).into_id();
         world.create_entity().attach(2u32);
 
         {
@@ -613,7 +613,7 @@ mod tests {
         world.register::<u32>();
 
         world.create_entity().attach(5u32);
-        let id = world.create_entity().attach(7u32).id();
+        let id = world.create_entity().attach(7u32).into_id();
         world.create_entity().attach(2u32);
 
         let entity = world.entity(id).unwrap();

@@ -37,8 +37,8 @@ impl<'a> Entity<'a>{
         }
     }
 
-    /// Get entity id
-    pub fn id(&self) -> EntityId{
+    /// Consume Entity and get an ID
+    pub fn into_id(self) -> EntityId{
         self.id
     }
 
