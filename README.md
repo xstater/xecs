@@ -1,7 +1,7 @@
 # XECS
 An Entity-Component-System library
 ## Example
-```no_run
+```rust,no_run
 // Define two components struct
 // Component is Send + Sync + 'static
 #[derive(Debug,Copy)]
@@ -17,7 +17,7 @@ let mut world = World::new();
 // generate 10 entities
 for _ in 0..10 {
     let x = random();
-    lety = random();
+    let y = random();
     // andomly generate the positions
     world.create_entity()
         .attach(Position { x,y });
