@@ -1,6 +1,5 @@
 use std::{any::TypeId, marker::PhantomData};
 use crate::{component::{Component, ComponentStorage}, entity::EntityId};
-
 use super::Group;
 
 mod query;

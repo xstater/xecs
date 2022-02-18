@@ -1,7 +1,7 @@
 use std::any::TypeId;
+use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
 use crate::{component::{Component, ComponentStorage}, entity::EntityId, group::{Group, non_owning}, query::{QueryIterator, Queryable}, sparse_set::SparseSet, world::World};
 use super::NonOwning;
-use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 pub struct IterRefRef<'a,A,B> {
     index: usize,

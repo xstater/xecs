@@ -1,5 +1,4 @@
 use crate::{entity::EntityId, world::World};
-
 use super::{QueryIterator, Queryable};
 
 impl<'a,A : 'a + Queryable<'a>,B :'a + Queryable<'a>> Queryable<'a> for (A,B) {

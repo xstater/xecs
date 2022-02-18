@@ -1,5 +1,5 @@
 use std::{fmt::{Debug, Display}, marker::PhantomData, ops::{Deref, DerefMut}};
-use std::sync::{RwLockReadGuard, RwLockWriteGuard};
+use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
 
 /// The resource trait 
 pub trait Resource : Send + Sync + 'static {}

@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 use crate::{entity::EntityId, world::World};
-
 use super::{QueryIterator, Queryable};
 
 pub struct Without<T>{

@@ -46,7 +46,7 @@
 //! So the pointer is valid when this struct is alive.
 use std::any::TypeId;
 use crate::{component::{Component, ComponentStorage}, entity::EntityId, sparse_set::SparseSet, world::World};
-use std::sync::{RwLockReadGuard, RwLockWriteGuard};
+use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
 
 mod with;
 mod without;

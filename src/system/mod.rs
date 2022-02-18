@@ -5,8 +5,9 @@
 //! # To Run System
 //! Because system is just an async trait, you need a wrapper of runtime from 
 //! [tokio](https://tokio.rs) or [async-std](https://async.rs)
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use futures::Stream;
+use parking_lot::RwLock;
 use crate::world::World;
 
 /// System core trait

@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
+use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
+
 use crate::{entity::EntityId, sparse_set::SparseSet};
-use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 /// The Component trait  
 pub trait Component : Send + Sync + 'static {}

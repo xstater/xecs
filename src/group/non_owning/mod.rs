@@ -3,6 +3,7 @@ use crate::{component::{Component, ComponentStorage}, entity::EntityId, sparse_s
 use super::Group;
 
 mod query;
+
 pub use query::{
     IterRefRef,
     IterRefMut,

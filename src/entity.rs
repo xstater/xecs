@@ -10,8 +10,8 @@
 //! the pit.Thanks to sparse set, it's still fast to 
 //! iterate all components no matter how random of ID
 use std::num::NonZeroUsize;
+use parking_lot::RwLockReadGuard;
 use crate::{component::{Component, ComponentRead, ComponentWrite}, world::World};
-use std::sync::RwLockReadGuard;
 
 /// The type of ID of entity which starts from 1 and can be recycled automatically
 pub type EntityId = NonZeroUsize;

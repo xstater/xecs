@@ -13,7 +13,7 @@ use crate::sparse_set::SparseSet;
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// World is the core of XECS.It manages all components and entities
 pub struct World {
@@ -45,7 +45,7 @@ impl World {
     pub fn resource_read<R : Resource>(&self) -> Option<ResourceRead<'_,R>> {
         let type_id = TypeId::of::<R>();
         let lock = self.resources.get(&type_id)?
-            .read().unwrap();
+            .read();
         Some(ResourceRead::new(lock))
     }
 
@@ -53,7 +53,7 @@ impl World {
     pub fn resource_write<R : Resource>(&self) -> Option<ResourceWrite<'_,R>> {
         let type_id = TypeId::of::<R>();
         let lock = self.resources.get(&type_id)?
-            .write().unwrap();
+            .write();
         Some(ResourceWrite::new(lock))
     }
 
@@ -81,7 +81,7 @@ impl World {
     ///  return an [Entity](crate::entity::Entity).
     pub fn create_entity(&self) -> Entity<'_> {
         let id = {
-            let mut entity_manager = self.entity_manager.write().unwrap();
+            let mut entity_manager = self.entity_manager.write();
             entity_manager.create()
         };
         self.entity(id).unwrap()
@@ -95,14 +95,14 @@ impl World {
         let mut groups = vec![];
         for group in &self.groups {
             let need_remove = {
-                let group = group.read().unwrap();
+                let group = group.read();
                 let (type_a,type_b) = group.types();
                 let comp_a = self.raw_storage_read(type_a).unwrap();
                 let comp_b = self.raw_storage_read(type_b).unwrap();
                 group.in_group(entity_id, &comp_a, &comp_b)
             };
             if need_remove {
-                groups.push(group.write().unwrap());
+                groups.push(group.write());
             };
         }
         // remove entity in group and its storages
@@ -135,11 +135,11 @@ impl World {
         let mut storages = vec![];
         for storage in self.components.values() {
             let need_remove = {
-                let storage = storage.read().unwrap();
+                let storage = storage.read();
                 storage.has(entity_id)
             };
             if need_remove {
-                storages.push(storage.write().unwrap());
+                storages.push(storage.write());
             }
         }
         for mut storage in storages {
@@ -147,7 +147,7 @@ impl World {
         }
         // remove entity from manager
         {
-            let mut entity_manager = self.entity_manager.write().unwrap();
+            let mut entity_manager = self.entity_manager.write();
             entity_manager.remove(entity_id);
         }
     }
@@ -158,7 +158,7 @@ impl World {
         -> Option<RwLockReadGuard<'_,Box<dyn ComponentStorage>>> {
         self.components
             .get(&id)
-            .map(|rwlock|rwlock.read().unwrap())
+            .map(|rwlock|rwlock.read())
     }
 
     /// Get lock guard of raw component storage,
@@ -167,7 +167,7 @@ impl World {
         -> Option<RwLockWriteGuard<'_,Box<dyn ComponentStorage>>> {
         self.components
             .get(&id)
-            .map(|rwlock|rwlock.write().unwrap())
+            .map(|rwlock|rwlock.write())
     }
 
     /// Attach a component to an entity.  
@@ -193,12 +193,12 @@ impl World {
         let mut groups = vec![];
         for group in &self.groups {
             let need_add = {
-                let group = group.read().unwrap();
+                let group = group.read();
                 let (type_id_a,type_id_b) = group.types();
                 type_id_a == type_id || type_id_b == type_id
             };
             if need_add {
-                groups.push(group.write().unwrap())
+                groups.push(group.write())
             }
         }
         for mut group in groups {
@@ -241,12 +241,12 @@ impl World {
         let mut groups = vec![];
         for group in &self.groups {
             let need_remove = {
-                let group = group.read().unwrap();
+                let group = group.read();
                 let (type_id_a,type_id_b) = group.types();
                 type_id_a == type_id || type_id_b == type_id
             };
             if need_remove {
-                groups.push(group.write().unwrap())
+                groups.push(group.write())
             }
         }
         for mut group in groups {
@@ -284,7 +284,7 @@ impl World {
 
     /// Check if ```entity_id``` exists in World.
     pub fn exist(&self, entity_id: EntityId) -> bool {
-        let entity_manager = self.entity_manager.read().unwrap();
+        let entity_manager = self.entity_manager.read();
         entity_manager.has(entity_id)
     }
 
@@ -328,7 +328,7 @@ impl World {
 
     /// Get an [Entity](crate::entity::Entity) from an entity id
     pub fn entity(&self,id : EntityId) -> Option<Entity<'_>> {
-        let lock = self.entity_manager.read().unwrap();
+        let lock = self.entity_manager.read();
         if lock.has(id) {
             Some(Entity::new(&self, lock, id))
         } else {
@@ -348,7 +348,7 @@ impl World {
             {
                 let mut ok = true;
                 'outer: for world_group in &self.groups {
-                    let world_group = world_group.read().unwrap();
+                    let world_group = world_group.read();
                     for owning_type in world_group.owning() {
                         if group.owned(owning_type) {
                             ok = false;
@@ -363,7 +363,7 @@ impl World {
 
         self.groups.push(RwLock::new(group));
         let group = self.groups.last().unwrap();
-        let mut group = group.write().unwrap();
+        let mut group = group.write();
         match &mut *group{
             Group::FullOwning(data) => {
                 let (type_a,type_b) = data.types();
@@ -391,7 +391,7 @@ impl World {
     pub(in crate) fn has_group<G : Into<Group> + 'static>(&self, group: G) -> bool {
         let group = group.into();
         for world_group in &self.groups {
-            let world_group = world_group.read().unwrap();
+            let world_group = world_group.read();
             if world_group.eq(&group) {
                 return true;
             }
@@ -404,14 +404,13 @@ impl World {
         self.groups
             .iter()
             .find(|world_group| {
-                let world_group = world_group.read().unwrap();
+                let world_group = world_group.read();
                 world_group.eq(&group)
             })
             // unwrap here
             // existence will be ensured by an outside function
             .unwrap()
             .read()
-            .unwrap()
     }
 
     /// [Query](crate::query) entities with conditions
