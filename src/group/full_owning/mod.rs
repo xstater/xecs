@@ -1,6 +1,5 @@
 use std::{any::TypeId, marker::PhantomData};
 use crate::{component::{Component, ComponentStorage}, entity::EntityId};
-use super::{FullOwningGroup, Group, GroupType};
 
 mod query;
 
@@ -11,34 +10,45 @@ pub use query::{
     IterMutMut
 };
 
-pub struct FullOwning<A,B>{
-    length: usize,
-    _marker_a : PhantomData<A>,
-    _marker_b : PhantomData<B>
+use super::Group;
+
+pub struct FullOwningData{
+    length : usize,
+    type_a : TypeId,
+    type_b : TypeId
 }
 
-impl<A : Component,B : Component> FullOwning<A,B> {
-    pub(in crate) fn new() -> Self {
-        FullOwning {
-            length: 0,
-            _marker_a: PhantomData::default(),
-            _marker_b: PhantomData::default(),
-        }
+impl PartialEq for FullOwningData {
+    fn eq(&self, other: &Self) -> bool {
+        self.type_a == other.type_a && self.type_b == other.type_b
     }
 }
 
-impl<A : Component,B : Component> Group for FullOwning<A,B> {
-    fn len(&self) -> usize {
+impl FullOwningData {
+    pub(in crate) fn len(&self) -> usize {
         self.length
     }
-
-    fn group_type(&self) -> GroupType {
-        GroupType::FullOwning(
-            TypeId::of::<A>(),
-            TypeId::of::<B>())
+    
+    pub(in crate) fn types(&self) -> (TypeId,TypeId) {
+        (self.type_a,self.type_b)
     }
 
-    fn in_group(&self,
+    pub(in crate) fn owned(&self,type_id : TypeId) -> bool {
+        type_id == self.type_a || type_id == self.type_b
+    }
+
+    pub(in crate) fn owning(&self) -> Vec<TypeId> {
+        vec![self.type_a,self.type_b]
+    }
+
+    pub(in crate) fn in_components( &self,
+                id : EntityId,
+                comp_a : &Box<dyn ComponentStorage>,
+                comp_b : &Box<dyn ComponentStorage>) -> bool {
+        comp_a.has(id) && comp_b.has(id)
+    }
+
+    pub(in crate) fn in_group(&self,
                 id : EntityId,
                 comp_a : &Box<dyn ComponentStorage>,
                 comp_b : &Box<dyn ComponentStorage>) -> bool {
@@ -56,10 +66,8 @@ impl<A : Component,B : Component> Group for FullOwning<A,B> {
             false
         }
     }
-}
 
-impl<A : Component,B : Component> FullOwningGroup for FullOwning<A,B> {
-    fn add(&mut self,
+    pub(in crate) fn add(&mut self,
            id : EntityId,
            comp_a : &mut Box<dyn ComponentStorage>,
            comp_b : &mut Box<dyn ComponentStorage>) {
@@ -81,7 +89,7 @@ impl<A : Component,B : Component> FullOwningGroup for FullOwning<A,B> {
         self.length += 1;
     }
 
-    fn remove(&mut self,
+    pub(in crate) fn remove(&mut self,
               id : EntityId,
               comp_a : &mut Box<dyn ComponentStorage>,
               comp_b : &mut Box<dyn ComponentStorage>) {
@@ -100,7 +108,7 @@ impl<A : Component,B : Component> FullOwningGroup for FullOwning<A,B> {
         comp_b.swap_by_index(index_b,self.length);
     }
 
-    fn make(&mut self,
+    pub(in crate) fn make(&mut self,
             comp_a : &mut Box<dyn ComponentStorage>,
             comp_b : &mut Box<dyn ComponentStorage>) {
         self.length = 0;
@@ -131,5 +139,30 @@ impl<A : Component,B : Component> FullOwningGroup for FullOwning<A,B> {
                     }
                 }
         }
+    }
+}
+
+#[derive(Clone,Copy)]
+pub struct FullOwning<A,B>{
+    _marker_a : PhantomData<A>,
+    _marker_b : PhantomData<B>
+}
+
+impl<A : Component,B : Component> FullOwning<A,B> {
+    pub(in crate) fn new() -> Self {
+        FullOwning {
+            _marker_a: PhantomData::default(),
+            _marker_b: PhantomData::default(),
+        }
+    }
+}
+
+impl<A : Component,B : Component> Into<Group> for FullOwning<A,B> {
+    fn into(self) -> Group {
+        Group::FullOwning(FullOwningData {
+            length: 0,
+            type_a: TypeId::of::<A>(),
+            type_b: TypeId::of::<B>()
+        })
     }
 }

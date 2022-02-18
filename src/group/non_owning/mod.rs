@@ -1,6 +1,6 @@
 use std::{any::TypeId, marker::PhantomData};
 use crate::{component::{Component, ComponentStorage}, entity::EntityId, sparse_set::SparseSet};
-use super::{Group, GroupType, NonOwningGroup};
+use super::Group;
 
 mod query;
 pub use query::{
@@ -10,34 +10,42 @@ pub use query::{
     IterMutMut
 };
 
-pub struct NonOwning<A,B>{
+
+pub struct NonOwningData {
     sparse_set : SparseSet<EntityId,(usize,usize)>,
-    _marker_a : PhantomData<A>,
-    _marker_b : PhantomData<B>
+    type_a : TypeId,
+    type_b : TypeId
 }
 
-impl<A : Component,B : Component> NonOwning<A,B> {
-    pub(in crate) fn new() -> Self {
-        NonOwning {
-            sparse_set : SparseSet::new(),
-            _marker_a : PhantomData::default(),
-            _marker_b : PhantomData::default()
-        }
+impl PartialEq for NonOwningData {
+    fn eq(&self, other: &Self) -> bool {
+        self.type_a == other.type_a && self.type_b == other.type_b
     }
 }
 
-impl<A : Component,B : Component> Group for NonOwning<A,B> {
-    fn len(&self) -> usize {
+impl NonOwningData {
+    pub(in crate) fn len(&self) -> usize {
         self.sparse_set.len()
     }
-
-    fn group_type(&self) -> GroupType {
-        GroupType::NonOwning(
-            TypeId::of::<A>(),
-            TypeId::of::<B>())
+    pub(in crate) fn types(&self) -> (TypeId,TypeId) {
+        (self.type_a,self.type_b)
     }
 
-    fn in_group(&self,
+    pub(in crate) fn owned(&self,_type_id : TypeId) -> bool {
+        false
+    }
+
+    pub(in crate) fn owning(&self) -> Vec<TypeId> {
+        vec![]
+    }
+
+    pub(in crate) fn in_components( &self,
+                id : EntityId,
+                comp_a : &Box<dyn ComponentStorage>,
+                comp_b : &Box<dyn ComponentStorage>) -> bool {
+        comp_a.has(id) && comp_b.has(id)
+    }
+    pub(in crate) fn in_group(&self,
                 id : EntityId,
                 comp_a : &Box<dyn ComponentStorage>,
                 comp_b : &Box<dyn ComponentStorage>) -> bool {
@@ -47,11 +55,7 @@ impl<A : Component,B : Component> Group for NonOwning<A,B> {
 
         self.sparse_set.exist(id)
     }
-}
-
-
-impl<A : Component,B : Component> NonOwningGroup for NonOwning<A,B> {
-    fn add(&mut self,
+    pub(in crate) fn add(&mut self,
            id : EntityId,
            comp_a : &Box<dyn ComponentStorage>,
            comp_b : &Box<dyn ComponentStorage>) {
@@ -70,7 +74,7 @@ impl<A : Component,B : Component> NonOwningGroup for NonOwning<A,B> {
         self.sparse_set.add(id,(index_a,index_b));
     }
 
-    fn remove(&mut self,
+    pub(in crate) fn remove(&mut self,
               id : EntityId,
               comp_a : &Box<dyn ComponentStorage>,
               comp_b : &Box<dyn ComponentStorage>) {
@@ -83,7 +87,7 @@ impl<A : Component,B : Component> NonOwningGroup for NonOwning<A,B> {
         self.sparse_set.remove(id).unwrap();
     }
 
-    fn make(&mut self,
+    pub(in crate) fn make(&mut self,
             comp_a : &Box<dyn ComponentStorage>,
             comp_b : &Box<dyn ComponentStorage>) {
         self.sparse_set.clear();
@@ -113,3 +117,27 @@ impl<A : Component,B : Component> NonOwningGroup for NonOwning<A,B> {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct NonOwning<A,B>{
+    _marker_a : PhantomData<A>,
+    _marker_b : PhantomData<B>
+}
+
+impl<A : Component,B : Component> NonOwning<A,B> {
+    pub(in crate) fn new() -> Self {
+        NonOwning {
+            _marker_a : PhantomData::default(),
+            _marker_b : PhantomData::default()
+        }
+    }
+}
+
+impl<A : Component,B : Component> Into<Group> for NonOwning<A,B> {
+    fn into(self) -> Group {
+        Group::NonOwning(NonOwningData {
+            sparse_set : SparseSet::new(),
+            type_a: TypeId::of::<A>(),
+            type_b: TypeId::of::<B>()
+        })
+    }
+}

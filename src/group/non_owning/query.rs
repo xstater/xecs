@@ -8,7 +8,7 @@ pub struct IterRefRef<'a,A,B> {
     sparse_set_a: *const SparseSet<EntityId,A>,
     sparse_set_b: *const SparseSet<EntityId,B>,
     #[allow(unused)]
-    borrow_group: RwLockReadGuard<'a,Box<dyn Group>>,
+    borrow_group: RwLockReadGuard<'a,Group>,
     #[allow(unused)]
     borrow_a: RwLockReadGuard<'a,Box<dyn ComponentStorage>>,
     #[allow(unused)]
@@ -37,13 +37,11 @@ impl<'a,A : Component,B : Component> Queryable<'a> for NonOwning<&'a A,&'a B> {
         };
         let ptr_a = &*sparse_set_a;
         let ptr_b = &*sparse_set_b;
-        let group = non_owning::<A,B>();
-        assert!(world.has_group(&group),"Queryable for NonOwning: Group is not in world");
-        let group = world.group(&group);
-        // Safety:
-        // group type is NonOwning<A,B>
-        let group_data = unsafe {
-            group.downcast_ref::<NonOwning<A,B>>()
+        assert!(world.has_group(non_owning::<A,B>()),"Queryable for NonOwning: Group is not in world");
+        let group = world.group(non_owning::<A,B>());
+        let group_data = match &*group {
+            Group::NonOwning(data) => data,
+            _ => unreachable!()
         };
         let group_data = &group_data.sparse_set;
         let ptr_group = &*group_data;
@@ -175,7 +173,7 @@ pub struct IterRefMut<'a,A,B> {
     sparse_set_a: *const SparseSet<EntityId,A>,
     sparse_set_b: *mut SparseSet<EntityId,B>,
     #[allow(unused)]
-    borrow_group: RwLockReadGuard<'a,Box<dyn Group>>,
+    borrow_group: RwLockReadGuard<'a,Group>,
     #[allow(unused)]
     borrow_a: RwLockReadGuard<'a,Box<dyn ComponentStorage>>,
     #[allow(unused)]
@@ -204,13 +202,11 @@ impl<'a,A : Component,B : Component> Queryable<'a> for NonOwning<&'a A,&'a mut B
         };
         let ptr_a = &*sparse_set_a;
         let ptr_b = &mut *sparse_set_b;
-        let group = non_owning::<A,B>();
-        assert!(world.has_group(&group),"Queryable for NonOwning: Group is not in world");
-        let group = world.group(&group);
-        // Safety:
-        // group type is NonOwning<A,B>
-        let group_data = unsafe {
-            group.downcast_ref::<NonOwning<A,B>>()
+        assert!(world.has_group(non_owning::<A,B>()),"Queryable for NonOwning: Group is not in world");
+        let group = world.group(non_owning::<A,B>());
+        let group_data = match &*group {
+            Group::NonOwning(data) => data,
+            _ => unreachable!()
         };
         let group_data = &group_data.sparse_set;
         let ptr_group = &*group_data;
@@ -342,7 +338,7 @@ pub struct IterMutRef<'a,A,B> {
     sparse_set_a: *mut SparseSet<EntityId,A>,
     sparse_set_b: *const SparseSet<EntityId,B>,
     #[allow(unused)]
-    borrow_group: RwLockReadGuard<'a,Box<dyn Group>>,
+    borrow_group: RwLockReadGuard<'a,Group>,
     #[allow(unused)]
     borrow_a: RwLockWriteGuard<'a,Box<dyn ComponentStorage>>,
     #[allow(unused)]
@@ -371,13 +367,11 @@ impl<'a,A : Component,B : Component> Queryable<'a> for NonOwning<&'a mut A,&'a B
         };
         let ptr_a = &mut *sparse_set_a;
         let ptr_b = &*sparse_set_b;
-        let group = non_owning::<A,B>();
-        assert!(world.has_group(&group),"Queryable for NonOwning: Group is not in world");
-        let group = world.group(&group);
-        // Safety:
-        // group type is NonOwning<A,B>
-        let group_data = unsafe {
-            group.downcast_ref::<NonOwning<A,B>>()
+        assert!(world.has_group(non_owning::<A,B>()),"Queryable for NonOwning: Group is not in world");
+        let group = world.group(non_owning::<A,B>());
+        let group_data = match &*group {
+            Group::NonOwning(data) => data,
+            _ => unreachable!()
         };
         let group_data = &group_data.sparse_set;
         let ptr_group = &*group_data;
@@ -510,7 +504,7 @@ pub struct IterMutMut<'a,A,B> {
     sparse_set_a: *mut SparseSet<EntityId,A>,
     sparse_set_b: *mut SparseSet<EntityId,B>,
     #[allow(unused)]
-    borrow_group: RwLockReadGuard<'a,Box<dyn Group>>,
+    borrow_group: RwLockReadGuard<'a,Group>,
     #[allow(unused)]
     borrow_a: RwLockWriteGuard<'a,Box<dyn ComponentStorage>>,
     #[allow(unused)]
@@ -539,13 +533,11 @@ impl<'a,A : Component,B : Component> Queryable<'a> for NonOwning<&'a mut A,&'a m
         };
         let ptr_a = &mut *sparse_set_a;
         let ptr_b = &mut *sparse_set_b;
-        let group = non_owning::<A,B>();
-        assert!(world.has_group(&group),"Queryable for NonOwning: Group is not in world");
-        let group = world.group(&group);
-        // Safety:
-        // group type is NonOwning<A,B>
-        let group_data = unsafe {
-            group.downcast_ref::<NonOwning<A,B>>()
+        assert!(world.has_group(non_owning::<A,B>()),"Queryable for NonOwning: Group is not in world");
+        let group = world.group(non_owning::<A,B>());
+        let group_data = match &*group {
+            Group::NonOwning(data) => data,
+            _ => unreachable!()
         };
         let group_data = &group_data.sparse_set;
         let ptr_group = &*group_data;

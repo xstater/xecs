@@ -9,7 +9,7 @@
 //! next ```world.create_entity()``` is called, it will allocate this ID to fill 
 //! the pit.Thanks to sparse set, it's still fast to 
 //! iterate all components no matter how random of ID
-use std::{num::NonZeroUsize, sync::RwLockReadGuard};
+use std::num::NonZeroUsize;
 use crate::{component::Component, world::World};
 
 /// The type of ID of entity which starts from 1 and can be recycled automatically
@@ -121,9 +121,9 @@ impl EntityManager {
         }
     }
 
-    pub(in crate) fn entities(&self) -> &[EntityId] {
-        self.entities.as_slice()
-    }
+    // pub(in crate) fn entities(&self) -> &[EntityId] {
+        // self.entities.as_slice()
+    // }
 
     #[allow(dead_code)]
     pub(in crate) fn len(&self) -> usize {

@@ -331,7 +331,6 @@ impl<A : QueryIterator> Iterator for IdIter<A> {
 #[cfg(test)]
 mod tests{
     use std::num::NonZeroUsize;
-
     use crate::{query::{WithId, Without}, world::World};
 
 

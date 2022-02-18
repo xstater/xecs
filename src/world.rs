@@ -6,7 +6,7 @@
 //! by [RwLock](std::sync::RwLock).So we can use world in concurrency environment by ```RwLock<World>```.
 use crate::component::{Component, StorageRead, ComponentStorage, StorageWrite};
 use crate::entity::{Entity, EntityId, EntityManager};
-use crate::group::{Group, GroupType};
+use crate::group::Group;
 use crate::query::{QueryIterator, Queryable};
 use crate::resource::{Resource, ResourceRead, ResourceWrite};
 use crate::sparse_set::SparseSet;
@@ -20,7 +20,7 @@ pub struct World {
     entity_manager: RwLock<EntityManager>,
     // Box<SparseSet<EntityId,Component>>
     components: HashMap<TypeId,RwLock<Box<dyn ComponentStorage>>>,
-    groups: Vec<RwLock<Box<dyn Group>>>,
+    groups: Vec<RwLock<Group>>,
     resources : HashMap<TypeId,RwLock<Box<dyn Resource>>>
 }
 
@@ -78,7 +78,7 @@ impl World {
     }
 
     /// Create an entity without any component in World,
-    ///  return an [EntityBuilder](crate::entity::EntityBuilder).
+    ///  return an [Entity](crate::entity::Entity).
     pub fn create_entity(&self) -> Entity<'_> {
         let id = {
             let mut entity_manager = self.entity_manager.write().unwrap();
@@ -101,7 +101,7 @@ impl World {
         for group in &self.groups {
             let need_remove = {
                 let group = group.read().unwrap();
-                let (type_a,type_b) = group.group_type().types();
+                let (type_a,type_b) = group.types();
                 let comp_a = self.raw_storage_read(type_a).unwrap();
                 let comp_b = self.raw_storage_read(type_b).unwrap();
                 group.in_group(entity_id, &comp_a, &comp_b)
@@ -112,30 +112,27 @@ impl World {
         }
         // remove entity in group and its storages
         for mut group in groups {
-            match group.group_type() {
-                GroupType::FullOwning(type_a,type_b) => {
+            match &mut *group{
+                Group::FullOwning(data) => {
+                    let (type_a,type_b) = data.types();
                     let mut comp_a = self.raw_storage_write(type_a).unwrap();
                     let mut comp_b = self.raw_storage_write(type_b).unwrap();
-                    unsafe {
-                        group.downcast_full_owning()
-                    }.remove(entity_id,&mut comp_a,&mut comp_b);
+                    data.remove(entity_id,&mut comp_a,&mut comp_b);
                     comp_a.remove(entity_id);
                     comp_b.remove(entity_id);
                 },
-                GroupType::PartialOwning(type_a,type_b) => {
+                Group::PartialOwning(data) => {
+                    let (type_a,type_b) = data.types();
                     let mut comp_a = self.raw_storage_write(type_a).unwrap();
                     let comp_b = self.raw_storage_read(type_b).unwrap();
-                    unsafe {
-                        group.downcast_partial_owning()
-                    }.remove(entity_id,&mut comp_a,&comp_b);
+                    data.remove(entity_id,&mut comp_a,&comp_b);
                     comp_a.remove(entity_id);
                 }
-                GroupType::NonOwning(type_a,type_b) => {
+                Group::NonOwning(data) => {
+                    let (type_a,type_b) = data.types();
                     let comp_a = self.raw_storage_read(type_a).unwrap();
                     let comp_b = self.raw_storage_read(type_b).unwrap();
-                    unsafe {
-                        group.downcast_non_owning()
-                    }.remove(entity_id,&comp_a,&comp_b);
+                    data.remove(entity_id,&comp_a,&comp_b);
                 },
             }
         }
@@ -197,7 +194,7 @@ impl World {
         for group in &self.groups {
             let need_add = {
                 let group = group.read().unwrap();
-                let (type_id_a,type_id_b) = group.group_type().types();
+                let (type_id_a,type_id_b) = group.types();
                 type_id_a == type_id || type_id_b == type_id
             };
             if need_add {
@@ -205,27 +202,24 @@ impl World {
             }
         }
         for mut group in groups {
-            match group.group_type() {
-                GroupType::FullOwning(type_a,type_b) => {
+            match &mut *group {
+                Group::FullOwning(data) => {
+                    let (type_a,type_b) = data.types();
                     let mut comp_a = self.raw_storage_write(type_a).unwrap();
                     let mut comp_b = self.raw_storage_write(type_b).unwrap();
-                    unsafe {
-                        group.downcast_full_owning()
-                    }.add(entity_id,&mut comp_a,&mut comp_b);
+                    data.add(entity_id,&mut comp_a,&mut comp_b);
                 },
-                GroupType::PartialOwning(type_a,type_b) => {
+                Group::PartialOwning(data) => {
+                    let (type_a,type_b) = data.types();
                     let mut comp_a = self.raw_storage_write(type_a).unwrap();
                     let comp_b = self.raw_storage_read(type_b).unwrap();
-                    unsafe {
-                        group.downcast_partial_owning()
-                    }.add(entity_id,&mut comp_a,&comp_b);
+                    data.add(entity_id,&mut comp_a,&comp_b);
                 },
-                GroupType::NonOwning(type_a,type_b) => {
+                Group::NonOwning(data) => {
+                    let (type_a,type_b) = data.types();
                     let comp_a = self.raw_storage_read(type_a).unwrap();
                     let comp_b = self.raw_storage_read(type_b).unwrap();
-                    unsafe {
-                        group.downcast_non_owning()
-                    }.add(entity_id,&comp_a,&comp_b);
+                    data.add(entity_id,&comp_a,&comp_b);
                 }
             }
         }
@@ -248,7 +242,7 @@ impl World {
         for group in &self.groups {
             let need_remove = {
                 let group = group.read().unwrap();
-                let (type_id_a,type_id_b) = group.group_type().types();
+                let (type_id_a,type_id_b) = group.types();
                 type_id_a == type_id || type_id_b == type_id
             };
             if need_remove {
@@ -256,27 +250,24 @@ impl World {
             }
         }
         for mut group in groups {
-            match group.group_type() {
-                GroupType::FullOwning(type_a,type_b) => {
+            match &mut *group{
+                Group::FullOwning(data) => {
+                    let (type_a,type_b) = data.types();
                     let mut comp_a = self.raw_storage_write(type_a).unwrap();
                     let mut comp_b = self.raw_storage_write(type_b).unwrap();
-                    unsafe {
-                        group.downcast_full_owning()
-                    }.remove(entity_id,&mut comp_a,&mut comp_b);
+                    data.remove(entity_id,&mut comp_a,&mut comp_b);
                 },
-                GroupType::PartialOwning(type_a,type_b) => {
+                Group::PartialOwning(data) => {
+                    let (type_a,type_b) = data.types();
                     let mut comp_a = self.raw_storage_write(type_a).unwrap();
                     let comp_b = self.raw_storage_read(type_b).unwrap();
-                    unsafe {
-                        group.downcast_partial_owning()
-                    }.remove(entity_id,&mut comp_a,&comp_b);
+                    data.remove(entity_id,&mut comp_a,&comp_b);
                 },
-                GroupType::NonOwning(type_a,type_b) => {
+                Group::NonOwning(data) => {
+                    let (type_a,type_b) = data.types();
                     let comp_a = self.raw_storage_read(type_a).unwrap();
                     let comp_b = self.raw_storage_read(type_b).unwrap();
-                    unsafe {
-                        group.downcast_non_owning()
-                    }.remove(entity_id,&comp_a,&comp_b);
+                    data.remove(entity_id,&comp_a,&comp_b);
                 }
             }
         }
@@ -315,16 +306,17 @@ impl World {
     /// ## Panics
     /// * Panic if ```group``` is the same as another group in [World](crate::world::World).
     /// * Panic if component is owned by another group.
-    pub fn make_group<G: Group + 'static>(&mut self, group: G) {
-        assert!(!self.has_group(&group),
+    pub fn make_group<G : Into<Group> + 'static + Copy>(&mut self, group: G) {
+        assert!(!self.has_group(group),
                 "World: Cannot make group because world has a same group");
+        let group = group.into();
         assert!(
             {
                 let mut ok = true;
                 'outer: for world_group in &self.groups {
                     let world_group = world_group.read().unwrap();
-                    for owning_type in world_group.group_type().owning() {
-                        if group.group_type().owned(owning_type) {
+                    for owning_type in world_group.owning() {
+                        if group.owned(owning_type) {
                             ok = false;
                             break 'outer;
                         }
@@ -335,52 +327,51 @@ impl World {
             "World: Cannot make group because component was owned by another group"
         );
 
-        self.groups.push(RwLock::new(Box::new(group)));
+        self.groups.push(RwLock::new(group));
         let group = self.groups.last().unwrap();
         let mut group = group.write().unwrap();
-        match group.group_type() {
-            GroupType::FullOwning(type_a,type_b) => {
+        match &mut *group{
+            Group::FullOwning(data) => {
+                let (type_a,type_b) = data.types();
                 let mut comp_a = self.raw_storage_write(type_a).unwrap();
                 let mut comp_b = self.raw_storage_write(type_b).unwrap();
-                unsafe {
-                    group.downcast_full_owning()
-                }.make(&mut comp_a,&mut comp_b);
+                data.make(&mut comp_a,&mut comp_b);
             },
-            GroupType::PartialOwning(type_a,type_b) => {
+            Group::PartialOwning(data) => {
+                let (type_a,type_b) = data.types();
                 let mut comp_a = self.raw_storage_write(type_a).unwrap();
                 let comp_b = self.raw_storage_read(type_b).unwrap();
-                unsafe {
-                    group.downcast_partial_owning()
-                }.make(&mut comp_a,&comp_b);
+                data.make(&mut comp_a,&comp_b);
             },
-            GroupType::NonOwning(type_a,type_b) => {
+            Group::NonOwning(data) => {
+                let (type_a,type_b) = data.types();
                 let comp_a = self.raw_storage_read(type_a).unwrap();
                 let comp_b = self.raw_storage_read(type_b).unwrap();
-                unsafe {
-                    group.downcast_non_owning()
-                }.make(&comp_a,&comp_b);
+                data.make(&comp_a,&comp_b);
             },
         }
     }
 
     /// Check if (group)[crate::group] exists in [World](crate::world::World).
     /// Return true if group is same as another group in World.
-    pub(in crate) fn has_group<G: Group + 'static>(&self, group: &G) -> bool {
+    pub(in crate) fn has_group<G : Into<Group> + 'static>(&self, group: G) -> bool {
+        let group = group.into();
         for world_group in &self.groups {
             let world_group = world_group.read().unwrap();
-            if world_group.group_type() == group.group_type() {
+            if world_group.eq(&group) {
                 return true;
             }
         }
         false
     }
 
-    pub(in crate) fn group<G: Group + 'static>(&self, group: &G) -> RwLockReadGuard<Box<dyn Group>> {
+    pub(in crate) fn group<G : Into<Group> + 'static>(&self, group: G) -> RwLockReadGuard<Group> {
+        let group = group.into();
         self.groups
             .iter()
             .find(|world_group| {
                 let world_group = world_group.read().unwrap();
-                world_group.group_type() == group.group_type()
+                world_group.eq(&group)
             })
             // unwrap here
             // existence will be ensured by an outside function
@@ -479,9 +470,13 @@ mod tests {
         print::<()>(&world, "()  :");
         println!();
 
+        dbg!("Here");
         world.make_group(full_owning::<u32, char>());
+        dbg!("Here");
         world.make_group(non_owning::<u32, char>());
+        dbg!("Here");
         world.make_group(partial_owning::<(), u32>());
+        dbg!("Here");
         println!("#Made group full/non<u32,char> partial_owning<(),u32>");
         print::<u32>(&world, "u32 :");
         print::<char>(&world, "char:");

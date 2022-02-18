@@ -1,7 +1,7 @@
 //! # XECS
 //! An Entity-Component-System library
 //! ## Example
-//! ```no_run
+//! ```rust,no_run
 //! // Define two components struct
 //! // Component is Send + Sync + 'static
 //! #[derive(Debug,Copy)]

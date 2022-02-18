@@ -1,5 +1,5 @@
 use std::{any::TypeId, sync::{RwLockReadGuard, RwLockWriteGuard}};
-use crate::{component::{Component, ComponentStorage}, entity::EntityId, group::full_owning, query::{QueryIterator, Queryable}, sparse_set::SparseSet, world::World};
+use crate::{component::{Component, ComponentStorage}, entity::EntityId, group::{Group, full_owning}, query::{QueryIterator, Queryable}, sparse_set::SparseSet, world::World};
 use super::FullOwning;
 
 pub struct IterRefRef<'a,A,B> {
@@ -10,7 +10,9 @@ pub struct IterRefRef<'a,A,B> {
     #[allow(unused)]
     borrow_a: RwLockReadGuard<'a,Box<dyn ComponentStorage>>,
     #[allow(unused)]
-    borrow_b: RwLockReadGuard<'a,Box<dyn ComponentStorage>>
+    borrow_b: RwLockReadGuard<'a,Box<dyn ComponentStorage>>,
+    #[allow(unused)]
+    borrow_group : RwLockReadGuard<'a,Group>
 }
 
 impl<'a,A : Component,B : Component> Queryable<'a> for FullOwning<&'a A,&'a B> {
@@ -35,16 +37,17 @@ impl<'a,A : Component,B : Component> Queryable<'a> for FullOwning<&'a A,&'a B> {
         };
         let ptr_a = &*sparse_set_a;
         let ptr_b = &*sparse_set_b;
-        let group = full_owning::<A,B>();
-        assert!(world.has_group(&group),"Queryable for FullOwning: Group is not in world");
-        let length = world.group(&group).len();
+        assert!(world.has_group(full_owning::<A,B>()),"Queryable for FullOwning: Group is not in world");
+        let group = world.group(full_owning::<A,B>());
+        let length = group.len();
         Box::new(IterRefRef{
             index: 0,
             length,
             sparse_set_a: ptr_a,
             sparse_set_b: ptr_b,
             borrow_a: storage_a,
-            borrow_b: storage_b
+            borrow_b: storage_b,
+            borrow_group: group,
         })
     }
 }
@@ -140,7 +143,9 @@ pub struct IterRefMut<'a,A,B> {
     #[allow(unused)]
     borrow_a: RwLockReadGuard<'a,Box<dyn ComponentStorage>>,
     #[allow(unused)]
-    borrow_b: RwLockWriteGuard<'a,Box<dyn ComponentStorage>>
+    borrow_b: RwLockWriteGuard<'a,Box<dyn ComponentStorage>>,
+    #[allow(unused)]
+    borrow_group: RwLockReadGuard<'a,Group>
 }
 
 impl<'a,A : Component,B : Component> Queryable<'a> for FullOwning<&'a A,&'a mut B> {
@@ -165,16 +170,17 @@ impl<'a,A : Component,B : Component> Queryable<'a> for FullOwning<&'a A,&'a mut 
         };
         let ptr_a = &*sparse_set_a;
         let ptr_b = &mut *sparse_set_b;
-        let group = full_owning::<A,B>();
-        assert!(world.has_group(&group),"Queryable for FullOwning: Group is not in world");
-        let length = world.group(&group).len();
+        assert!(world.has_group(full_owning::<A,B>()),"Queryable for FullOwning: Group is not in world");
+        let group = world.group(full_owning::<A,B>());
+        let length = group.len();
         Box::new(IterRefMut{
             index: 0,
             length,
             sparse_set_a: ptr_a,
             sparse_set_b: ptr_b,
             borrow_a: storage_a,
-            borrow_b: storage_b
+            borrow_b: storage_b,
+            borrow_group: group,
         })
     }
 }
@@ -271,7 +277,9 @@ pub struct IterMutRef<'a,A,B> {
     #[allow(unused)]
     borrow_a: RwLockWriteGuard<'a,Box<dyn ComponentStorage>>,
     #[allow(unused)]
-    borrow_b: RwLockReadGuard<'a,Box<dyn ComponentStorage>>
+    borrow_b: RwLockReadGuard<'a,Box<dyn ComponentStorage>>,
+    #[allow(unused)]
+    borrow_group: RwLockReadGuard<'a,Group>
 }
 
 impl<'a,A : Component,B : Component> Queryable<'a> for FullOwning<&'a mut A,&'a B> {
@@ -296,16 +304,17 @@ impl<'a,A : Component,B : Component> Queryable<'a> for FullOwning<&'a mut A,&'a 
         };
         let ptr_a = &mut *sparse_set_a;
         let ptr_b = &*sparse_set_b;
-        let group = full_owning::<A,B>();
-        assert!(world.has_group(&group),"Queryable for FullOwning: Group is not in world");
-        let length = world.group(&group).len();
+        assert!(world.has_group(full_owning::<A,B>()),"Queryable for FullOwning: Group is not in world");
+        let group = world.group(full_owning::<A,B>());
+        let length = group.len();
         Box::new(IterMutRef{
             index: 0,
             length,
             sparse_set_a: ptr_a,
             sparse_set_b: ptr_b,
             borrow_a: storage_a,
-            borrow_b: storage_b
+            borrow_b: storage_b,
+            borrow_group: group,
         })
     }
 }
@@ -401,7 +410,9 @@ pub struct IterMutMut<'a,A,B> {
     #[allow(unused)]
     borrow_a: RwLockWriteGuard<'a,Box<dyn ComponentStorage>>,
     #[allow(unused)]
-    borrow_b: RwLockWriteGuard<'a,Box<dyn ComponentStorage>>
+    borrow_b: RwLockWriteGuard<'a,Box<dyn ComponentStorage>>,
+    #[allow(unused)]
+    borrow_group: RwLockReadGuard<'a,Group>
 }
 
 impl<'a,A : Component,B : Component> Queryable<'a> for FullOwning<&'a mut A,&'a mut B> {
@@ -426,16 +437,17 @@ impl<'a,A : Component,B : Component> Queryable<'a> for FullOwning<&'a mut A,&'a 
         };
         let ptr_a = &mut *sparse_set_a;
         let ptr_b = &mut *sparse_set_b;
-        let group = full_owning::<A,B>();
-        assert!(world.has_group(&group),"Queryable for FullOwning: Group is not in world");
-        let length = world.group(&group).len();
+        assert!(world.has_group(full_owning::<A,B>()),"Queryable for FullOwning: Group is not in world");
+        let group = world.group(full_owning::<A,B>());
+        let length = group.len();
         Box::new(IterMutMut{
             index: 0,
             length,
             sparse_set_a: ptr_a,
             sparse_set_b: ptr_b,
             borrow_a: storage_a,
-            borrow_b: storage_b
+            borrow_b: storage_b,
+            borrow_group: group,
         })
     }
 }
