@@ -43,7 +43,7 @@ impl<'a> Entity<'a>{
     }
 
     /// Attach a component to entity
-    pub fn attach<T : Component>(&self,component : T) -> &Self{
+    pub fn attach<T : Component>(self,component : T) -> Self{
         self.world.attach_component(self.id,component);
         self
     }
