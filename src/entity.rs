@@ -9,9 +9,9 @@
 //! next ```world.create_entity()``` is called, it will allocate this ID to fill 
 //! the pit.Thanks to sparse set, it's still fast to 
 //! iterate all components no matter how random of ID
-use std::num::NonZeroUsize;
+use std::{any::TypeId, num::NonZeroUsize};
 use parking_lot::RwLockReadGuard;
-use crate::{component::{Component, ComponentRead, ComponentWrite}, world::World};
+use crate::{component::{Component, ComponentRead, ComponentWrite}, group::Group, sparse_set::SparseSet, world::World};
 
 /// The type of ID of entity which starts from 1 and can be recycled automatically
 pub type EntityId = NonZeroUsize;
@@ -44,14 +44,87 @@ impl<'a> Entity<'a>{
     }
 
     /// Attach a component to entity
+    /// # Panics
+    /// * Panics if ```T``` has not been registered
     pub fn attach<T : Component>(self,component : T) -> Self{
-        self.world.attach_component(self.id,component);
+        let world = self.world;
+        assert!(world.has_registered::<T>(),
+                "Entity:Cannot attach component because components has not been registered.");
+        let type_id = TypeId::of::<T>();
+        {
+            // Unwrap never fails because assert ensures this
+            let mut storage = world.raw_storage_write(type_id).unwrap();
+            // SAFTY:
+            // storage is SparseSet<EntityId,T>
+            let sparse_set = unsafe {
+                storage.downcast_mut::<SparseSet<EntityId,T>>()
+            };
+            sparse_set.add(self.id,component);
+        }
+        for mut group in world.groups(type_id) {
+            match &mut *group {
+                Group::FullOwning(data) => {
+                    let (type_a,type_b) = data.types();
+                    let mut comp_a = world.raw_storage_write(type_a).unwrap();
+                    let mut comp_b = world.raw_storage_write(type_b).unwrap();
+                    data.add(self.id,&mut comp_a,&mut comp_b);
+                },
+                Group::PartialOwning(data) => {
+                    let (type_a,type_b) = data.types();
+                    let mut comp_a = world.raw_storage_write(type_a).unwrap();
+                    let comp_b = world.raw_storage_read(type_b).unwrap();
+                    data.add(self.id,&mut comp_a,&comp_b);
+                },
+                Group::NonOwning(data) => {
+                    let (type_a,type_b) = data.types();
+                    let comp_a = world.raw_storage_read(type_a).unwrap();
+                    let comp_b = world.raw_storage_read(type_b).unwrap();
+                    data.add(self.id,&comp_a,&comp_b);
+                }
+            }
+        }
         self
     }
 
     /// Detach a component from entity
+    /// # Panics
+    /// * Panics if ```T``` has not been registered
     pub fn detach<T : Component>(&self) -> Option<T> {
-        self.world.detach_component(self.id)
+        let world = self.world;
+        assert!(world.has_registered::<T>(),
+                "World:Cannot detach component because components has not been registered.");
+        let type_id = TypeId::of::<T>();
+        for mut group in world.groups(type_id) {
+            match &mut *group{
+                Group::FullOwning(data) => {
+                    let (type_a,type_b) = data.types();
+                    let mut comp_a = world.raw_storage_write(type_a).unwrap();
+                    let mut comp_b = world.raw_storage_write(type_b).unwrap();
+                    data.remove(self.id,&mut comp_a,&mut comp_b);
+                },
+                Group::PartialOwning(data) => {
+                    let (type_a,type_b) = data.types();
+                    let mut comp_a = world.raw_storage_write(type_a).unwrap();
+                    let comp_b = world.raw_storage_read(type_b).unwrap();
+                    data.remove(self.id,&mut comp_a,&comp_b);
+                },
+                Group::NonOwning(data) => {
+                    let (type_a,type_b) = data.types();
+                    let comp_a = world.raw_storage_read(type_a).unwrap();
+                    let comp_b = world.raw_storage_read(type_b).unwrap();
+                    data.remove(self.id,&comp_a,&comp_b);
+                }
+            }
+        }
+
+        // Unwrap never fails because assert ensures this
+        let mut storage = world.raw_storage_write(type_id).unwrap();
+        // SAFTY:
+        // storage is SparseSet<EntityId,T>
+        let sparse_set = unsafe {
+            storage.downcast_mut::<SparseSet<EntityId,T>>()
+        };
+        sparse_set.remove(self.id)
     }
 
     /// Read component of this entity

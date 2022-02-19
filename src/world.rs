@@ -175,54 +175,9 @@ impl World {
     /// * Panic if ```T``` is not registered.
     /// * Panic if ```entity_id``` not exist.
     pub fn attach_component<T: Component>(&self, entity_id: EntityId,component: T) {
-        assert!(self.has_registered::<T>(),
-                "World:Cannot attach component because components has not been registered.");
-        assert!(self.exist(entity_id),
-                "World:Cannot attach component to a non-exist entity");
-        let type_id = TypeId::of::<T>();
-        {
-            // Unwrap never fails because assert ensures this
-            let mut storage = self.raw_storage_write(type_id).unwrap();
-            // SAFTY:
-            // storage is SparseSet<EntityId,T>
-            let sparse_set = unsafe {
-                storage.downcast_mut::<SparseSet<EntityId,T>>()
-            };
-            sparse_set.add(entity_id,component);
-        }
-        let mut groups = vec![];
-        for group in &self.groups {
-            let need_add = {
-                let group = group.read();
-                let (type_id_a,type_id_b) = group.types();
-                type_id_a == type_id || type_id_b == type_id
-            };
-            if need_add {
-                groups.push(group.write())
-            }
-        }
-        for mut group in groups {
-            match &mut *group {
-                Group::FullOwning(data) => {
-                    let (type_a,type_b) = data.types();
-                    let mut comp_a = self.raw_storage_write(type_a).unwrap();
-                    let mut comp_b = self.raw_storage_write(type_b).unwrap();
-                    data.add(entity_id,&mut comp_a,&mut comp_b);
-                },
-                Group::PartialOwning(data) => {
-                    let (type_a,type_b) = data.types();
-                    let mut comp_a = self.raw_storage_write(type_a).unwrap();
-                    let comp_b = self.raw_storage_read(type_b).unwrap();
-                    data.add(entity_id,&mut comp_a,&comp_b);
-                },
-                Group::NonOwning(data) => {
-                    let (type_a,type_b) = data.types();
-                    let comp_a = self.raw_storage_read(type_a).unwrap();
-                    let comp_b = self.raw_storage_read(type_b).unwrap();
-                    data.add(entity_id,&comp_a,&comp_b);
-                }
-            }
-        }
+        self.entity(entity_id)
+            .expect("World: Cannot attach component to a non-existence entity")
+            .attach(component);
     }
 
     /// Detach a component from an entity.
@@ -233,53 +188,9 @@ impl World {
     /// * Panic if ```T``` is not registered.
     /// * Panic if ```entity_id``` not exist.
     pub fn detach_component<T: Component>(&self, entity_id: EntityId) -> Option<T> {
-        assert!(self.has_registered::<T>(),
-                "World:Cannot detach component because components has not been registered.");
-        assert!(self.exist(entity_id),
-                "World:Cannot detach component from a non-exist entity");
-        let type_id = TypeId::of::<T>();
-        let mut groups = vec![];
-        for group in &self.groups {
-            let need_remove = {
-                let group = group.read();
-                let (type_id_a,type_id_b) = group.types();
-                type_id_a == type_id || type_id_b == type_id
-            };
-            if need_remove {
-                groups.push(group.write())
-            }
-        }
-        for mut group in groups {
-            match &mut *group{
-                Group::FullOwning(data) => {
-                    let (type_a,type_b) = data.types();
-                    let mut comp_a = self.raw_storage_write(type_a).unwrap();
-                    let mut comp_b = self.raw_storage_write(type_b).unwrap();
-                    data.remove(entity_id,&mut comp_a,&mut comp_b);
-                },
-                Group::PartialOwning(data) => {
-                    let (type_a,type_b) = data.types();
-                    let mut comp_a = self.raw_storage_write(type_a).unwrap();
-                    let comp_b = self.raw_storage_read(type_b).unwrap();
-                    data.remove(entity_id,&mut comp_a,&comp_b);
-                },
-                Group::NonOwning(data) => {
-                    let (type_a,type_b) = data.types();
-                    let comp_a = self.raw_storage_read(type_a).unwrap();
-                    let comp_b = self.raw_storage_read(type_b).unwrap();
-                    data.remove(entity_id,&comp_a,&comp_b);
-                }
-            }
-        }
-
-        // Unwrap never fails because assert ensures this
-        let mut storage = self.raw_storage_write(type_id).unwrap();
-        // SAFTY:
-        // storage is SparseSet<EntityId,T>
-        let sparse_set = unsafe {
-            storage.downcast_mut::<SparseSet<EntityId,T>>()
-        };
-        sparse_set.remove(entity_id)
+        self.entity(entity_id)
+            .expect("World: Cannot detach component to a non-existence entity")
+            .detach::<T>()
     }
 
     /// Check if ```entity_id``` exists in World.
@@ -411,6 +322,21 @@ impl World {
             // existence will be ensured by an outside function
             .unwrap()
             .read()
+    }
+
+    pub(in crate) fn groups(&self,type_id : TypeId) -> Vec<RwLockWriteGuard<'_,Group>> {
+        let mut groups = vec![];
+        for group in &self.groups {
+            let need_add = {
+                let group = group.read();
+                let (type_id_a,type_id_b) = group.types();
+                type_id_a == type_id || type_id_b == type_id
+            };
+            if need_add {
+                groups.push(group.write())
+            }
+        }
+        groups
     }
 
     /// [Query](crate::query) entities with conditions
