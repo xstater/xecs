@@ -332,79 +332,91 @@ impl<A : QueryIterator> Iterator for IdIter<A> {
 #[cfg(test)]
 mod tests{
     use std::num::NonZeroUsize;
-    use crate::{query::{WithId, Without}, world::World};
+    use crate::{component::Component, query::{WithId, Without}, world::World};
 
+    #[derive(Debug,Clone,Copy,PartialEq)]
+    struct Char(char);
+    #[derive(Debug,Clone,Copy,PartialEq)]
+    struct U32(u32);
+    #[derive(Debug,Clone,Copy,PartialEq)]
+    struct Tag;
+
+    impl Component for Char{}
+    impl Component for U32{}
+    impl Component for Tag {}
 
     #[test]
     fn basic_test() {
-        #[derive(Debug,Clone,Copy,PartialEq)]
-        struct Tag;
 
         let mut world = World::new();
 
-        world.register::<u32>()
-            .register::<char>()
+        world.register::<U32>()
+            .register::<Char>()
             .register::<Tag>();
 
-        world.create_entity().attach(1_u32);
-        world.create_entity().attach(2_u32).attach('c');
-        world.create_entity().attach(3_u32).attach(Tag);
-        world.create_entity().attach(4_u32).attach('b');
-        world.create_entity().attach(5_u32).attach('q').attach(Tag);
-        world.create_entity().attach(6_u32).attach('w');
-        world.create_entity().attach(7_u32);
-        world.create_entity().attach(8_u32).attach('s').attach(Tag);
+        world.create_entity().attach(U32(1));
+        world.create_entity().attach(U32(2)).attach(Char('c'));
+        world.create_entity().attach(U32(3)).attach(Tag);
+        world.create_entity().attach(U32(4)).attach(Char('b'));
+        world.create_entity().attach(U32(5)).attach(Char('q')).attach(Tag);
+        world.create_entity().attach(U32(6)).attach(Char('w'));
+        world.create_entity().attach(U32(7));
+        world.create_entity().attach(U32(8)).attach(Char('s')).attach(Tag);
 
-        let res = world.query::<(&u32,&char)>()
+        let res = world.query::<(&U32,&Char)>()
             .map(|(a,b)|(*a,*b))
             .collect::<Vec<_>>();
-        assert_eq!(&res,&[(2,'c'),(4,'b'),(5,'q'),(6_u32,'w'),(8_u32,'s')]);
+        assert_eq!(&res,&[
+                   (U32(2),Char('c')),
+                   (U32(4),Char('b')),
+                   (U32(5),Char('q')),
+                   (U32(6),Char('w')),
+                   (U32(8),Char('s'))]);
 
-        let res = world.query::<(&u32,(&mut char,&Tag))>()
+        let res = world.query::<(&U32,(&mut Char,&Tag))>()
             .map(|(a,(b,c))|(*a,*b,*c))
             .collect::<Vec<_>>();
-        assert_eq!(&res,&[(5,'q',Tag),(8,'s',Tag)]);
+        assert_eq!(&res,&[(U32(5),Char('q'),Tag),(U32(8),Char('s'),Tag)]);
 
-        let res = world.query::<(&u32,(&mut char,&Tag))>()
+        let res = world.query::<(&U32,(&mut Char,&Tag))>()
             .with_id()
             .map(|(id,(a,(b,c)))|(id,*a,*b,*c))
             .collect::<Vec<_>>();
-        assert_eq!(&res,&[(NonZeroUsize::new(5).unwrap(),5,'q',Tag),(NonZeroUsize::new(8).unwrap(),8,'s',Tag)]);
+        assert_eq!(&res,&[
+                   (NonZeroUsize::new(5).unwrap(),U32(5),Char('q'),Tag),
+                   (NonZeroUsize::new(8).unwrap(),U32(8),Char('s'),Tag)]);
     }
 
     #[test]
     fn without_test() {
-        #[derive(Debug,Clone,Copy,PartialEq)]
-        struct Tag;
-
         let mut world = World::new();
 
-        world.register::<u32>()
-            .register::<char>()
+        world.register::<U32>()
+            .register::<Char>()
             .register::<Tag>();
 
-        world.create_entity().attach(1_u32);
-        world.create_entity().attach(2_u32).attach('c');
-        world.create_entity().attach(3_u32).attach(Tag);
-        world.create_entity().attach(4_u32).attach('b');
-        world.create_entity().attach(5_u32).attach('q').attach(Tag);
-        world.create_entity().attach(6_u32).attach('w');
-        world.create_entity().attach(7_u32);
-        world.create_entity().attach(8_u32).attach('s').attach(Tag);
+        world.create_entity().attach(U32(1));
+        world.create_entity().attach(U32(2)).attach(Char('c'));
+        world.create_entity().attach(U32(3)).attach(Tag);
+        world.create_entity().attach(U32(4)).attach(Char('b'));
+        world.create_entity().attach(U32(5)).attach(Char('q')).attach(Tag);
+        world.create_entity().attach(U32(6)).attach(Char('w'));
+        world.create_entity().attach(U32(7));
+        world.create_entity().attach(U32(8)).attach(Char('s')).attach(Tag);
 
-        let res = world.query::<(&u32,Without<&char>)>()
+        let res = world.query::<(&U32,Without<&Char>)>()
             .map(|a|*a)
             .collect::<Vec<_>>();
-        assert_eq!(&res,& [1,3,7]);
+        assert_eq!(&res,&[U32(1),U32(3),U32(7)]);
 
-        let res = world.query::<(Without<(&char,&Tag)>,&u32)>()
+        let res = world.query::<(Without<(&Char,&Tag)>,&U32)>()
             .map(|b|*b)
             .collect::<Vec<_>>();
-        assert_eq!(&res,&[1,2,3,4,6,7]);
+        assert_eq!(&res,&[U32(1),U32(2),U32(3),U32(4),U32(6),U32(7)]);
 
-        let res = world.query::<(Without<&Tag>,(&u32,Without<&char>))>()
+        let res = world.query::<(Without<&Tag>,(&U32,Without<&Char>))>()
             .map(|b|*b)
             .collect::<Vec<_>>();
-        assert_eq!(&res,&[1,7]);
+        assert_eq!(&res,&[U32(1),U32(7)]);
     }
 }

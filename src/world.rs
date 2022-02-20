@@ -363,33 +363,45 @@ impl Debug for World {
 #[cfg(test)]
 mod tests {
     use crate::component::Component;
+    use crate::resource::Resource;
     use std::fmt::Debug;
     use crate::group::{full_owning, non_owning, partial_owning};
     use crate::query::WithId;
     use crate::world::World;
 
+    #[derive(Debug,Clone,Copy,PartialEq)]
+    struct Char(char);
+    #[derive(Debug,Clone,Copy,PartialEq)]
+    struct U32(u32);
+    #[derive(Debug,Clone,Copy,PartialEq)]
+    struct Unit;
+
+    impl Component for Char{}
+    impl Component for U32{}
+    impl Component for Unit{}
+
     #[test]
     fn component_test() {
         let mut world = World::new();
-        world.register::<char>();
+        world.register::<Char>();
         let id1 = world.create_entity().into_id();
         let id2 = world.create_entity().into_id();
         let _id3 = world.create_entity().into_id();
 
-        world.attach_component(id1, 'c');
-        world.attach_component(id2, 'a');
+        world.attach_component(id1,Char('c'));
+        world.attach_component(id2,Char('a'));
 
         {
-            let components = world.components_read::<char>().unwrap();
+            let components = world.components_read::<Char>().unwrap();
             let components = components.data();
-            assert_eq!(components,&['c','a'])
+            assert_eq!(components,&[Char('c'),Char('a')])
         }
         world.remove_entity(id1);
 
         {
-            let components = world.components_read::<char>().unwrap();
+            let components = world.components_read::<Char>().unwrap();
             let components = components.data();
-            assert_eq!(components,&['a'])
+            assert_eq!(components,&[Char('a')])
         }
     }
 
@@ -397,10 +409,9 @@ mod tests {
     fn group_test() {
 
         let mut world = World::new();
-
-        world.register::<u32>();
-        world.register::<char>();
-        world.register::<()>();
+        world.register::<U32>();
+        world.register::<Char>();
+        world.register::<Unit>();
 
         fn print<T>(world : &World,msg : &str)
         where T: Component + Clone + Debug {
@@ -411,56 +422,56 @@ mod tests {
             println!("{}:{:?}",msg,&v);
         }
 
-        world.create_entity().attach(1u32).attach(());
-        let id2 = world.create_entity().attach(2u32).into_id();
+        world.create_entity().attach(U32(1)).attach(Unit);
+        let id2 = world.create_entity().attach(U32(2)).into_id();
         let id3 = world
             .create_entity()
-            .attach(3u32)
-            .attach('a')
-            .attach(())
+            .attach(U32(3))
+            .attach(Char('a'))
+            .attach(Unit)
             .into_id();
-        world.create_entity().attach(4u32).attach('b');
-        world.create_entity().attach(5u32).attach('c');
-        world.create_entity().attach(6u32);
-        let id7 = world.create_entity().attach('d').attach(()).into_id();
+        world.create_entity().attach(U32(4)).attach(Char('b'));
+        world.create_entity().attach(U32(5)).attach(Char('c'));
+        world.create_entity().attach(U32(6));
+        let id7 = world.create_entity().attach(Char('d')).attach(Unit).into_id();
         println!("#initial");
-        print::<u32>(&world, "u32 :");
-        print::<char>(&world, "char:");
-        print::<()>(&world, "()  :");
+        print::<U32>(&world, "u32 :");
+        print::<Char>(&world, "char:");
+        print::<Unit>(&world, "()  :");
         println!();
 
         dbg!("Here");
-        world.make_group(full_owning::<u32, char>());
+        world.make_group(full_owning::<U32, Char>());
         dbg!("Here");
-        world.make_group(non_owning::<u32, char>());
+        world.make_group(non_owning::<U32, Char>());
         dbg!("Here");
-        world.make_group(partial_owning::<(), u32>());
+        world.make_group(partial_owning::<Unit, U32>());
         dbg!("Here");
         println!("#Made group full/non<u32,char> partial_owning<(),u32>");
-        print::<u32>(&world, "u32 :");
-        print::<char>(&world, "char:");
-        print::<()>(&world, "()  :");
+        print::<U32>(&world, "u32 :");
+        print::<Char>(&world, "char:");
+        print::<Unit>(&world, "()  :");
         println!();
 
-        world.attach_component(id2,'b');
+        world.attach_component(id2,Char('b'));
         println!("#attach component char b for id=2");
-        print::<u32>(&world, "u32 :");
-        print::<char>(&world, "char:");
-        print::<()>(&world, "()  :");
+        print::<U32>(&world, "u32 :");
+        print::<Char>(&world, "char:");
+        print::<Unit>(&world, "()  :");
         println!();
 
-        world.attach_component(id7,2u32);
+        world.attach_component(id7,U32(2));
         println!("#attach component u32=2 for id=7");
-        print::<u32>(&world, "u32 :");
-        print::<char>(&world, "char:");
-        print::<()>(&world, "()  :");
+        print::<U32>(&world, "u32 :");
+        print::<Char>(&world, "char:");
+        print::<Unit>(&world, "()  :");
         println!();
 
-        world.detach_component::<u32>(id3);
+        world.detach_component::<U32>(id3);
         println!("#detach component u32 for id=3");
-        print::<u32>(&world, "u32 :");
-        print::<char>(&world, "char:");
-        print::<()>(&world, "()  :");
+        print::<U32>(&world, "u32 :");
+        print::<Char>(&world, "char:");
+        print::<Unit>(&world, "()  :");
         println!();
     }
 
@@ -468,16 +479,16 @@ mod tests {
     fn debug_trait_test() {
         let mut world = World::new();
 
-        world.register::<char>();
-        world.register::<u32>();
+        world.register::<Char>();
+        world.register::<U32>();
 
-        world.create_entity().attach('c').attach(12_u32);
-        world.create_entity().attach('a');
+        world.create_entity().attach(Char('c')).attach(U32(12));
+        world.create_entity().attach(Char('a'));
 
-        world.make_group(full_owning::<char, u32>());
+        world.make_group(full_owning::<Char, U32>());
 
-        world.create_entity().attach('c').attach(12_u32);
-        world.create_entity().attach('a');
+        world.create_entity().attach(Char('c')).attach(U32(12));
+        world.create_entity().attach(Char('a'));
 
         println!("{:?}", world);
     }
@@ -490,6 +501,7 @@ mod tests {
             name : String,
             age : u32
         }
+        impl Resource for Test {}
         
         world.register_resource(Test{
             name : "affff".to_string(),
@@ -509,25 +521,25 @@ mod tests {
     fn entity_component_test() {
         let mut world = World::new();
 
-        world.register::<u32>();
+        world.register::<U32>();
 
-        world.create_entity().attach(5u32);
-        let id = world.create_entity().attach(7u32).into_id();
-        world.create_entity().attach(2u32);
+        world.create_entity().attach(U32(5));
+        let id = world.create_entity().attach(U32(7)).into_id();
+        world.create_entity().attach(U32(2));
 
         {
-            let v = world.entity_component_read::<u32>(id).unwrap();
-            assert_eq!(*v,7u32);
+            let v = world.entity_component_read::<U32>(id).unwrap();
+            assert_eq!(*v,U32(7));
         }
 
         {
-            let mut v = world.entity_component_write::<u32>(id).unwrap();
-            *v = 3u32;
+            let mut v = world.entity_component_write::<U32>(id).unwrap();
+            *v = U32(3);
         }
 
         {
-            let v = world.entity_component_read::<u32>(id).unwrap();
-            assert_eq!(*v,3u32);
+            let v = world.entity_component_read::<U32>(id).unwrap();
+            assert_eq!(*v,U32(3));
         }
     }
 
@@ -535,27 +547,27 @@ mod tests {
     fn entity_test() {
         let mut world = World::new();
 
-        world.register::<u32>();
+        world.register::<U32>();
 
-        world.create_entity().attach(5u32);
-        let id = world.create_entity().attach(7u32).into_id();
-        world.create_entity().attach(2u32);
+        world.create_entity().attach(U32(5));
+        let id = world.create_entity().attach(U32(7)).into_id();
+        world.create_entity().attach(U32(2));
 
         let entity = world.entity(id).unwrap();
 
         {
-            let v = entity.component_read::<u32>().unwrap();
-            assert_eq!(*v,7u32);
+            let v = entity.component_read::<U32>().unwrap();
+            assert_eq!(*v,U32(7));
         }
 
         {
-            let mut v = entity.component_write::<u32>().unwrap();
-            *v = 3u32;
+            let mut v = entity.component_write::<U32>().unwrap();
+            *v = U32(3);
         }
 
         {
-            let v = entity.component_read::<u32>().unwrap();
-            assert_eq!(*v,3u32);
+            let v = entity.component_read::<U32>().unwrap();
+            assert_eq!(*v,U32(3));
         }
     }
 }
