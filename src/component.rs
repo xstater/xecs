@@ -4,6 +4,7 @@ use crate::{entity::EntityId, sparse_set::SparseSet};
 
 /// The Component trait  
 pub trait Component : Send + Sync + 'static {}
+impl<T : Send + Sync + 'static> Component for T {}
 
 /// A trait to make sparse set dynamic  
 pub trait ComponentStorage : Send + Sync{

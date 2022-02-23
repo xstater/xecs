@@ -3,6 +3,7 @@ use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
 
 /// The resource trait 
 pub trait Resource : Send + Sync + 'static {}
+impl<T : Send + Sync + 'static> Resource for T {}
 
 impl dyn Resource {
     pub(in crate) unsafe fn downcast_ref<T : Resource>(&self) -> &T{
