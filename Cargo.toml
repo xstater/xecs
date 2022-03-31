@@ -1,6 +1,6 @@
 [package]
 name = "xecs"
-version = "0.5.7"
+version = "0.5.8"
 authors = ["xstater:a166224@163.com"]
 edition = "2021"
 license = "MIT"
