@@ -6,8 +6,8 @@
 //! Because system is just an async trait, you need a wrapper of runtime from 
 //! [tokio](https://tokio.rs) or [async-std](https://async.rs)
 use std::sync::Arc;
-use futures::Stream;
 use parking_lot::RwLock;
+use tokio_stream::Stream;
 use crate::world::World;
 
 /// System core trait
