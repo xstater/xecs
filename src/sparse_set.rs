@@ -45,6 +45,26 @@ impl<E,T> SparseSet<E,T>
         }
     }
 
+    pub fn add_batch(&mut self,entities : &[E],mut data : Vec<T>) {
+        assert_eq!(entities.len(),data.len());
+        let start_index = self.entities.len();
+        // copy data to dense
+        self.entities.extend_from_slice(entities);
+        self.data.append(&mut data);
+        // store data in sparse
+        for (index,entity) in entities.iter().enumerate() {
+            let entity_ : usize = (*entity).into();
+            // enlarge sparse
+            while self.indices.len() <= entity_ {
+                self.indices.push(None);
+            }
+            // store index to sparse
+            self.indices[entity_] = Some(unsafe {
+                NonZeroUsize::new_unchecked(start_index + index + 1)
+            });
+        }
+    }
+
     pub fn remove(&mut self,entity : E) -> Option<T> {
         let entity : usize = entity.into();
         if self.indices.len() < entity {
@@ -235,5 +255,19 @@ mod tests{
         assert_eq!(s1.entities(),&[2,6,5,3]);
         assert_eq!(s1.data(),&['d','c','b','a']);
         println!("{:?}",s1);
+    }
+
+    #[test]
+    fn batch() {
+        let mut s = SparseSet::new();
+        let entities = [2_usize,5,3,4];
+        let data = vec!['a','b','c','d'];
+        s.add_batch(&entities,data);
+        println!("{:?}",s);
+
+        let entities = [1_usize,6];
+        let data = vec!['e','f'];
+        s.add_batch(&entities,data);
+        println!("{:?}",s);
     }
 }
