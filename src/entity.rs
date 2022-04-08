@@ -158,6 +158,10 @@ impl<'a> Entities<'a> {
         }
     }
 
+    /// Attach components to all entities
+    /// # Panics
+    /// * Panics if ```T``` has not been registered
+    /// * Panics if ```components.len()``` is not equal to the count of entities
     pub fn attach<T,C>(self,components: C) -> Self
     where T : Component,
           C : Into<Vec<T>>{
@@ -183,6 +187,10 @@ impl<'a> Entities<'a> {
         self
     }
 
+    /// Get ID range
+    /// # Details
+    /// Because create_entites() ensure the id is continuous,
+    /// so we can just return the range of EntityId for optimization
     pub fn into_ids(self) -> Range<EntityId> {
         self.ids
     }

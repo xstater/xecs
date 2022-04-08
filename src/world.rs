@@ -87,6 +87,9 @@ impl World {
         self.entity(id).unwrap()
     }
 
+    /// Create count of entities
+    /// # Details
+    /// This funtionn ensures tbe entity id is continuous.
     pub fn create_entities(&self,count: usize) -> Entities<'_> {
         let ids = {
             let mut entity_manager = self.entity_manager.write();
