@@ -19,3 +19,6 @@ Cargo.lock
 
 # for IDEA
 .idea
+
+# for VSCode
+.vscode
