@@ -17,7 +17,7 @@
  // generate 10 entities
  for _ in 0..10 {
      let x = random();
-     lety = random();
+     let y = random();
      // andomly generate the positions
      world.create_entity()
          .attach(Position { x,y });
