@@ -9,7 +9,7 @@
 //! next ```world.create_entity()``` is called, it will allocate this ID to fill 
 //! the pit.Thanks to sparse set, it's still fast to 
 //! iterate all components no matter how random of ID
-use std::{any::TypeId, num::NonZeroUsize};
+use std::{any::TypeId, num::NonZeroUsize, ops::Range};
 use parking_lot::RwLockReadGuard;
 use crate::{component::{Component, ComponentRead, ComponentWrite}, group::Group, sparse_set::SparseSet, world::World};
 
@@ -138,6 +138,56 @@ impl<'a> Entity<'a>{
     }
 }
 
+pub struct Entities<'a>{
+    world: &'a World,
+    ids : Range<EntityId>,
+    // To avoid remove this ID from world
+    // The ID must be valid during Entity is alive
+    #[allow(unused)]
+    borrow_entity_manager : RwLockReadGuard<'a,EntityManager>
+}
+
+impl<'a> Entities<'a> {
+    pub(in crate) fn new(world : &'a World,
+                         ids : Range<EntityId>,
+                         borrow_entity_manager : RwLockReadGuard<'a,EntityManager>,) -> Self{
+        Entities{
+            world,
+            ids,
+            borrow_entity_manager,
+        }
+    }
+
+    pub fn attach<T,C>(self,components: C) -> Self
+    where T : Component,
+          C : Into<Vec<T>>{
+        // ensure the slice length is equal to the entity count
+        let count = self.ids.end.get() - self.ids.start.get();
+        let components : Vec<T> = components.into();
+        assert_eq!(components.len(),count);
+        let type_id = TypeId::of::<T>();
+        let mut sparse_set = self.world.raw_storage_write(type_id)
+            .expect("Entities:Cannot attach component because components has not been registered.");
+        // Safety:
+        // sparse_set is SparseSet<EntityId,T>
+        let sparse_set = unsafe {
+            sparse_set.downcast_mut::<SparseSet<EntityId,T>>()
+        };
+        // create Id slice
+        let ids = (self.ids.start.get()..self.ids.end.get())
+            // Safety:
+            // Safe here id cannot be zero 
+            .map(|id|unsafe{EntityId::new_unchecked(id)})
+            .collect::<Vec<_>>();
+        sparse_set.add_batch(&ids,components);
+        self
+    }
+
+    pub fn into_ids(self) -> Range<EntityId> {
+        self.ids
+    }
+}
+
 #[derive(Debug,Copy,Clone)]
 enum EntityFlag{
     /// store the next available EntityID
@@ -164,7 +214,7 @@ impl EntityManager {
         }
     }
 
-    pub(in crate) fn create(&mut self) -> EntityId {
+    pub(in crate) fn allocate(&mut self) -> EntityId {
         //safe here:
         // the entity_flags[0] cannot be removed
         if let EntityFlag::Available(last_id) = self.entity_flags.first().unwrap() {
@@ -187,6 +237,27 @@ impl EntityManager {
         }
     }
 
+    /// Allocate ```n``` entities
+    /// This ensure the entity id is continuous
+    pub(in crate) fn allocate_n(&mut self, n : usize) -> Range<EntityId> {
+        // Get the range of entity id
+        let start_id = self.entity_flags.len();
+        let end_id = start_id + n;   
+        // Get the range of entity index
+        let start_index = self.entities.len();
+        let end_index = start_index + n;
+        // record indecies to self.entity_flags
+        for i in start_index..end_index {
+            self.entity_flags.push(EntityFlag::Unavailable(i));
+        }
+        for id in start_id..end_id {
+            let id = unsafe { EntityId::new_unchecked(id) };
+            self.entities.push(id);
+        }
+        let start_id = unsafe { EntityId::new_unchecked(start_id) };
+        let end_id = unsafe { EntityId::new_unchecked(end_id) };
+        start_id..end_id
+    }
     // remove entity id
     // Do nothing if entity_id not exist
     pub(in crate) fn remove(&mut self,entity_id : EntityId) {
@@ -211,11 +282,10 @@ impl EntityManager {
         }
     }
 
-    // pub(in crate) fn entities(&self) -> &[EntityId] {
-        // self.entities.as_slice()
-    // }
+    pub(in crate) fn entities(&self) -> &[EntityId] {
+        &self.entities
+    }
 
-    #[allow(dead_code)]
     pub(in crate) fn len(&self) -> usize {
         self.entities.len()
     }
@@ -229,11 +299,11 @@ mod tests{
     fn manager_test() {
         let mut manager = EntityManager::new();
 
-        manager.create(); // 1
-        manager.create(); // 2
-        manager.create(); // 3
-        manager.create(); // 4
-        manager.create(); // 5
+        manager.allocate(); // 1
+        manager.allocate(); // 2
+        manager.allocate(); // 3
+        manager.allocate(); // 4
+        manager.allocate(); // 5
         assert_eq!(dbg!(manager.len()),5);
         println!("#initial");
         println!("flags    :{:?}",manager.entity_flags.as_slice());
@@ -254,26 +324,47 @@ mod tests{
         println!("flags :{:?}",manager.entity_flags.as_slice());
         println!("entities :{:?}",manager.entities.as_slice());
         println!();
-        assert_eq!(manager.create(),EntityId::new(1).unwrap());
+        assert_eq!(manager.allocate(),EntityId::new(1).unwrap());
         println!("#create a new entity, id = 1");
         println!("flags :{:?}",manager.entity_flags.as_slice());
         println!("entities :{:?}",manager.entities.as_slice());
         println!();
-        assert_eq!(manager.create(),EntityId::new(5).unwrap());
+        assert_eq!(manager.allocate(),EntityId::new(5).unwrap());
         println!("#create a new entity, id = 5");
         println!("flags :{:?}",manager.entity_flags.as_slice());
         println!("entities :{:?}",manager.entities.as_slice());
         println!();
-        assert_eq!(manager.create(),EntityId::new(3).unwrap());
+        assert_eq!(manager.allocate(),EntityId::new(3).unwrap());
         println!("#create a new entity, id = 3");
         println!("flags :{:?}",manager.entity_flags.as_slice());
         println!("entities :{:?}",manager.entities.as_slice());
         println!();
-        assert_eq!(manager.create(),EntityId::new(6).unwrap());
+        assert_eq!(manager.allocate(),EntityId::new(6).unwrap());
         println!("#create a new entity, id = 6");
         println!("flags :{:?}",manager.entity_flags.as_slice());
         println!("entities :{:?}",manager.entities.as_slice());
         println!();
+    }
+
+    #[test]
+    fn create_entities() {
+        let mut manager = EntityManager::new();
+
+        let range = manager.allocate_n(5);
+        let range = range.start.get()..range.end.get();
+        let entities = range.map(|id|EntityId::new(id).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(manager.entities(),&entities);
+        println!("flags:{:?}",manager.entity_flags.as_slice());
+        println!("entities:{:?}",manager.entities.as_slice());
+
+        let range = manager.allocate_n(3);
+        let range = range.start.get()..range.end.get();
+        let entities = range.map(|id|EntityId::new(id).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(&manager.entities()[5..8],&entities);
+        println!("flags:{:?}",manager.entity_flags.as_slice());
+        println!("entities:{:?}",manager.entities.as_slice());
     }
     
 }
