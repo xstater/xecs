@@ -1,6 +1,6 @@
 //! # XECS
 //! An Entity-Component-System library
-//! ## Example
+//! ## Simple Example
 //! ```rust,no_run
 //! // Define two components struct
 //! // Component is Send + Sync + 'static
@@ -48,20 +48,64 @@
 //!     print!("{}:{:?}",id,data);
 //! }
 //! ```
-
-/// The core of XECS, world struct
-pub mod world;
-/// Some useful structs about entities
-pub mod entity;
-/// Component core trait
-pub mod component;
+//! 
+//! # About entity
+//! Entity in XECS is just an number ID.In XECS, it's just a 
+//! [NonZeroUsize](std::num::NonZeroUsize).
+//! The ID is allocated from 1 by world automatically. The ```id=0``` 
+//! represents a recycled ID without any other flags through ```Option<EntityId>```.
+//! 
+//! # ID recycling
+//! When you call ```world.create_entity()```, an ID will be allocated automatically. 
+//! If you call ```world.remove_entity(id)```, this ID will be a pit. If the 
+//! next ```world.create_entity()``` is called, it will allocate this ID to fill 
+//! the pit.Thanks to sparse set, it's still fast to 
+//! iterate all components no matter how random of ID
+//! 
+//! # Concurrency Safety
+//! Because [Component](crate::component::Component) is just ```T : Send + Sync```.
+//! [World](crate::world::World) can use [RwLock](std::sync::RwLock) to 
+//! ensure the borrow check relations of all components.And [World](crate::world::World) can also
+//! be ```Send + Sync```.Therefore,the all other states of world can be guarded
+//! by [RwLock](std::sync::RwLock).So we can use world in concurrency environment by ```RwLock<World>```.
+//! 
+//! # System in XECS
+//! System is a [Stream](futures::Stream) with [World](crate::world::World) 
+//! as Context. Because [Stream](futures::Stream) is not stable 
+//! in [std](std), XECS use [futures](futures)::[Stream](futures::Stream) instead.
+//! # To Run System
+//! Because system is just an async trait, you need a wrapper of runtime from 
+//! [tokio](https://tokio.rs) or [async-std](https://async.rs)
+mod world;
+mod entity;
+mod component;
+mod system;
+mod resource;
 /// Some things to accelerate the iteration
 pub mod group;
 /// The query functions
 pub mod query;
 pub(in crate) mod sparse_set;
-/// The system trait
-pub mod system;
 /// The resource type
-pub mod resource;
+
+pub use world::World;
+pub use entity::{
+    EntityId,
+    Entity,
+    Entities,
+};
+pub use component::{
+    Component,
+    ComponentRead,
+    ComponentWrite,
+    ComponentStorage,
+    StorageRead,
+    StorageWrite
+};
+pub use system::System;
+pub use resource::{
+    Resource,
+    ResourceRead,
+    ResourceWrite
+};
 

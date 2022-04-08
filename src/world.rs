@@ -1,9 +1,3 @@
-//! ## Concurrency Safety
-//! Because [Component](crate::component::Component) is just ```T : Send + Sync```.
-//! [World](crate::world::World) can use [RwLock](std::sync::RwLock) to 
-//! ensure the borrow check relations of all components.And [World](crate::world::World) can also
-//! be ```Send + Sync```.Therefore,the all other states of world can be guarded
-//! by [RwLock](std::sync::RwLock).So we can use world in concurrency environment by ```RwLock<World>```.
 use crate::component::{Component, ComponentRead, ComponentStorage, ComponentWrite, StorageRead, StorageWrite};
 use crate::entity::{Entity, EntityId, EntityManager, Entities};
 use crate::group::Group;

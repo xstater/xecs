@@ -1,14 +1,3 @@
-//! # About entity
-//! Entity in XECS is just an number ID.In XECS, it's just a 
-//! [NonZeroUsize](std::num::NonZeroUsize).
-//! The ID is allocated from 1 by world automatically. The ```id=0``` 
-//! represents a recycled ID without any other flags through ```Option<EntityId>```.
-//! # ID recycling
-//! When you call ```world.create_entity()```, an ID will be allocated automatically. 
-//! If you call ```world.remove_entity(id)```, this ID will be a pit. If the 
-//! next ```world.create_entity()``` is called, it will allocate this ID to fill 
-//! the pit.Thanks to sparse set, it's still fast to 
-//! iterate all components no matter how random of ID
 use std::{any::TypeId, num::NonZeroUsize, ops::Range};
 use parking_lot::RwLockReadGuard;
 use crate::{component::{Component, ComponentRead, ComponentWrite}, group::Group, sparse_set::SparseSet, world::World};
@@ -138,6 +127,7 @@ impl<'a> Entity<'a>{
     }
 }
 
+/// A useful struct for building a lot of entities
 pub struct Entities<'a>{
     world: &'a World,
     ids : Range<EntityId>,

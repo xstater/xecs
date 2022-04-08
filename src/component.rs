@@ -62,7 +62,7 @@ impl dyn 'static + ComponentStorage {
     }
 }
 
-
+/// A read gurad for component storage
 pub struct StorageRead<'a,T>{
     _lock : RwLockReadGuard<'a,Box<dyn ComponentStorage>>,
     ptr : *const SparseSet<EntityId,T>
@@ -81,31 +81,41 @@ impl<'a,T : Component> StorageRead<'a,T> {
         }
     }
 
+    /// Get the count of strorage
     pub fn count(&self) -> usize {
         let sparse_set = unsafe { &*self.ptr };
         sparse_set.len()
     }
 
+    /// Check if id is in storage
     pub fn exist(&self,id : EntityId) -> bool {
         let sparse_set = unsafe { &*self.ptr };
         sparse_set.exist(id)
     }
 
+    /// Get component from storage by id
+    /// # Details
+    /// * Return None if id is not in storage
     pub fn get(&self,id : EntityId) -> Option<&T> {
         let sparse_set = unsafe { &*self.ptr };
         sparse_set.get(id)
     }
 
+    /// Get component from storage by index
+    /// # Safety
+    /// * Safe when id is in storage
     pub unsafe fn get_unchecked(&self,id : EntityId) -> &T {
         let sparse_set = &*self.ptr;
         sparse_set.get_unchecked(id)
     }
 
+    /// Check storage is empty
     pub fn is_empty(&self) -> bool {
         let sparse_set = unsafe { &*self.ptr };
         sparse_set.is_empty()
     }
 
+    /// Get the data slice
     pub fn data(&self) -> &[T] {
         let sparse_set = unsafe { &*self.ptr };
         sparse_set.data()
@@ -115,7 +125,7 @@ impl<'a,T : Component> StorageRead<'a,T> {
 
 
 
-
+/// A write gurad for component storage
 pub struct StorageWrite<'a,T>{
     _lock : RwLockWriteGuard<'a,Box<dyn ComponentStorage>>,
     ptr : *mut SparseSet<EntityId,T>
@@ -134,46 +144,63 @@ impl<'a,T : Component> StorageWrite<'a,T> {
         }
     }
 
+    /// Get the count of strorage
     pub fn count(&self) -> usize {
         let sparse_set = unsafe { &*self.ptr };
         sparse_set.len()
     }
 
+    /// Check if id is in storage
     pub fn exist(&self,id : EntityId) -> bool {
         let sparse_set = unsafe { &*self.ptr };
         sparse_set.exist(id)
     }
 
+    /// Get component from storage by id
+    /// # Details
+    /// * Return None if id is not in storage
     pub fn get(&self,id : EntityId) -> Option<&T> {
         let sparse_set = unsafe { &*self.ptr };
         sparse_set.get(id)
     }
 
+    /// Get component from storage by index
+    /// # Safety
+    /// * Safe when id is in storage
     pub unsafe fn get_unchecked(&self,id : EntityId) -> &T {
         let sparse_set = &*self.ptr;
         sparse_set.get_unchecked(id)
     }
 
+    /// Check storage is empty
     pub fn is_empty(&self) -> bool {
         let sparse_set = unsafe { &*self.ptr };
         sparse_set.is_empty()
     }
 
+    /// Get component from storage by id
+    /// # Details
+    /// * Return None if id is not in storage
     pub fn get_mut(&mut self,id : EntityId) -> Option<&mut T> {
         let sparse_set = unsafe { &mut *self.ptr };
         sparse_set.get_mut(id)
     }
 
+    /// Get component from storage by index
+    /// # Safety
+    /// * Safe when id is in storage
     pub unsafe fn get_unchecked_mut(&mut self,id : EntityId) -> &mut T {
         let sparse_set = &mut *self.ptr;
         sparse_set.get_unchecked_mut(id)
     }
 
+    /// Get the data slice
     pub fn data(&self) -> &[T] {
         let sparse_set = unsafe { &*self.ptr };
         sparse_set.data()
     }
 
+    /// Get the data slice
     pub fn data_mut(&mut self) -> &mut [T] {
         let sparse_set = unsafe { &mut *self.ptr };
         sparse_set.data_mut()
@@ -182,7 +209,7 @@ impl<'a,T : Component> StorageWrite<'a,T> {
 
 
 
-
+/// A read gurad for component
 pub struct ComponentRead<'a,T> {
     id : EntityId,
     storage : StorageRead<'a,T>
@@ -213,7 +240,7 @@ impl<'a,T : Component> Deref for ComponentRead<'a,T> {
 
 
 
-
+/// A write guard for component
 pub struct ComponentWrite<'a,T> {
     id : EntityId,
     storage : StorageWrite<'a,T>
