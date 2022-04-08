@@ -5,7 +5,7 @@
 //! be ```Send + Sync```.Therefore,the all other states of world can be guarded
 //! by [RwLock](std::sync::RwLock).So we can use world in concurrency environment by ```RwLock<World>```.
 use crate::component::{Component, ComponentRead, ComponentStorage, ComponentWrite, StorageRead, StorageWrite};
-use crate::entity::{Entity, EntityId, EntityManager};
+use crate::entity::{Entity, EntityId, EntityManager, Entities};
 use crate::group::Group;
 use crate::query::{QueryIterator, Queryable};
 use crate::resource::{Resource, ResourceRead, ResourceWrite};
@@ -82,9 +82,18 @@ impl World {
     pub fn create_entity(&self) -> Entity<'_> {
         let id = {
             let mut entity_manager = self.entity_manager.write();
-            entity_manager.create()
+            entity_manager.allocate()
         };
         self.entity(id).unwrap()
+    }
+
+    pub fn create_entities(&self,count: usize) -> Entities<'_> {
+        let ids = {
+            let mut entity_manager = self.entity_manager.write();
+            entity_manager.allocate_n(count)
+        };
+        let entity_manager = self.entity_manager.read();
+        Entities::new(self,ids,entity_manager)
     }
 
     /// Remove entity and its components.
@@ -364,6 +373,7 @@ impl Debug for World {
 mod tests {
     use std::fmt::Debug;
     use crate::component::Component;
+    use crate::entity::EntityId;
     use crate::group::{full_owning, non_owning, partial_owning};
     use crate::query::WithId;
     use crate::world::World;
@@ -558,5 +568,40 @@ mod tests {
             let v = entity.component_read::<u32>().unwrap();
             assert_eq!(*v,3);
         }
+    }
+
+    #[test]
+    fn enitites_test() {
+        let mut world = World::new();
+
+        world.register::<u32>();
+        world.register::<char>();
+
+        world.create_entity()
+            .attach(2_u32)
+            .attach('a');
+
+        let ids = world.create_entities(5)
+            .attach([1_u32,2,3,4,5].as_slice())
+            .attach(['a','b','c','d','e'].as_slice())
+            .into_ids();
+        
+        println!("{:?}",ids);
+        
+        {
+            let num = world.components_read::<u32>().unwrap();
+            let chr = world.components_read::<char>().unwrap();
+            assert_eq!(num.data(),&[2,1_u32,2,3,4,5]);
+            assert_eq!(chr.data(),&['a','a','b','c','d','e']);
+        }
+
+        // remove one id in ids
+        world.remove_entity(EntityId::new(4).unwrap());
+
+        // craete a new one 
+        let id = world.create_entity().into_id();
+
+        // check if id is reused
+        assert_eq!(id,EntityId::new(4).unwrap());
     }
 }
