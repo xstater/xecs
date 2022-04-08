@@ -280,10 +280,12 @@ impl EntityManager {
         }
     }
 
+    #[allow(dead_code)]
     pub(in crate) fn entities(&self) -> &[EntityId] {
         &self.entities
     }
 
+    #[allow(dead_code)]
     pub(in crate) fn len(&self) -> usize {
         self.entities.len()
     }
