@@ -125,6 +125,11 @@ impl<'a> Entity<'a>{
     pub fn component_write<T : Component>(&self) -> Option<ComponentWrite<'_,T>> {
         self.world.entity_component_write(self.id)
     }
+
+    /// remove this entity from the world
+    pub fn manaully_drop(self) {
+        self.world.remove_entity(self.id)
+    }
 }
 
 /// A useful struct for building a lot of entities
