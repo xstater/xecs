@@ -128,7 +128,8 @@ impl<'a> Entity<'a>{
 
     /// remove this entity from the world
     pub fn manaully_drop(self) {
-        self.world.remove_entity(self.id)
+        drop(self.borrow_entity_manager);
+        self.world.remove_entity(self.id);
     }
 }
 
