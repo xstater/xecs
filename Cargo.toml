@@ -15,3 +15,4 @@ categories = ["game-development","game-engines"]
 [dependencies]
 parking_lot = "0.12"
 futures = "0.3"
+xsparseset = "0.2"
