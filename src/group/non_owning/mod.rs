@@ -54,7 +54,7 @@ impl NonOwningData {
             return false;
         }
 
-        self.sparse_set.exist(id)
+        self.sparse_set.contains(id)
     }
     pub(in crate) fn add(&mut self,
            id : EntityId,
@@ -72,7 +72,7 @@ impl NonOwningData {
         let index_a = comp_a.index(id).unwrap();
         let index_b = comp_b.index(id).unwrap();
 
-        self.sparse_set.add(id,(index_a,index_b));
+        self.sparse_set.insert(id,(index_a,index_b));
     }
 
     pub(in crate) fn remove(&mut self,
@@ -102,7 +102,7 @@ impl NonOwningData {
                 // the for loop ensures this
                 let entity_id = comp_a.id(index_a).unwrap();
                 if let Some(index_b) = comp_b.index(entity_id) {
-                    self.sparse_set.add(entity_id,(index_a,index_b));
+                    self.sparse_set.insert(entity_id,(index_a,index_b));
                 }
             }
         } else {
@@ -111,7 +111,7 @@ impl NonOwningData {
                 // the for loop ensures this
                 let entity_id = comp_b.id(index_b).unwrap();
                 if let Some(index_a) = comp_a.index(entity_id) {
-                    self.sparse_set.add(entity_id,(index_a,index_b));
+                    self.sparse_set.insert(entity_id,(index_a,index_b));
                 }
             }
         }
@@ -136,7 +136,7 @@ impl<A : Component,B : Component> NonOwning<A,B> {
 impl<A : Component,B : Component> Into<Group> for NonOwning<A,B> {
     fn into(self) -> Group {
         Group::NonOwning(NonOwningData {
-            sparse_set : SparseSet::new(),
+            sparse_set : SparseSet::default(),
             type_a: TypeId::of::<A>(),
             type_b: TypeId::of::<B>()
         })

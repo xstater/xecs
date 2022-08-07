@@ -60,7 +60,7 @@ impl World {
         let type_id = TypeId::of::<T>();
         self.components.insert(
             type_id,
-            RwLock::new(Box::new(SparseSet::<EntityId, T>::new())),
+            RwLock::new(Box::new(SparseSet::<EntityId, T>::default())),
         );
         self
     }
@@ -565,40 +565,5 @@ mod tests {
             let v = entity.component_read::<u32>().unwrap();
             assert_eq!(*v,3);
         }
-    }
-
-    #[test]
-    fn enitites_test() {
-        let mut world = World::new();
-
-        world.register::<u32>();
-        world.register::<char>();
-
-        world.create_entity()
-            .attach(2_u32)
-            .attach('a');
-
-        let ids = world.create_entities(5)
-            .attach([1_u32,2,3,4,5].as_slice())
-            .attach(['a','b','c','d','e'].as_slice())
-            .into_ids();
-        
-        println!("{:?}",ids);
-        
-        {
-            let num = world.components_read::<u32>().unwrap();
-            let chr = world.components_read::<char>().unwrap();
-            assert_eq!(num.data(),&[2,1_u32,2,3,4,5]);
-            assert_eq!(chr.data(),&['a','a','b','c','d','e']);
-        }
-
-        // remove one id in ids
-        world.remove_entity(EntityId::new(4).unwrap());
-
-        // craete a new one 
-        let id = world.create_entity().into_id();
-
-        // check if id is reused
-        assert_eq!(id,EntityId::new(4).unwrap());
     }
 }

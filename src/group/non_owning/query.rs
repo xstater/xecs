@@ -136,7 +136,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterRefRef<'a,A,B> {
             // Safety:
             // Safe here, because if condition ensures this.
             let id = *unsafe {
-                group.entities().get_unchecked(self.index)
+                group.ids().get_unchecked(self.index)
             };
             let (index_a,index_b) = unsafe {
                 group.data().get_unchecked(self.index)
@@ -301,7 +301,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterRefMut<'a,A,B> {
             // Safety:
             // Safe here, because if condition ensures this.
             let id = *unsafe {
-                group.entities().get_unchecked(self.index)
+                group.ids().get_unchecked(self.index)
             };
             let (index_a,index_b) = unsafe {
                 group.data().get_unchecked(self.index)
@@ -466,7 +466,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutRef<'a,A,B> {
             // Safety:
             // Safe here, because if condition ensure this
             let id = *unsafe {
-                group.entities().get_unchecked(self.index)
+                group.ids().get_unchecked(self.index)
             };
             let (index_a,index_b) = unsafe {
                 group.data().get_unchecked(self.index)
@@ -632,7 +632,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutMut<'a,A,B> {
             // Safety:
             // Safe here, because if condition ensure this
             let id = *unsafe {
-                group.entities().get_unchecked(self.index)
+                group.ids().get_unchecked(self.index)
             };
             let (index_a,index_b) = unsafe {
                 group.data().get_unchecked(self.index)

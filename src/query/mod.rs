@@ -176,7 +176,7 @@ impl<'a,T : Component> QueryIterator for IterRef<'a,T> {
             // Safety:
             // Safe here, because we have already checked.
             let id = *unsafe {
-                sparse_set.entities().get_unchecked(self.index)
+                sparse_set.ids().get_unchecked(self.index)
             };
             // Safety:
             // Safe here, because we have already checked.
@@ -275,7 +275,7 @@ impl<'a,T : Component> QueryIterator for IterMut<'a,T> {
             // Safety:
             // Safe here, because we have already checked.
             let id = *unsafe {
-                sparse_set.entities().get_unchecked(self.index)
+                sparse_set.ids().get_unchecked(self.index)
             };
             // Safety:
             // Safe here, because we have already checked.

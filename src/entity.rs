@@ -48,7 +48,7 @@ impl<'a> Entity<'a>{
             let sparse_set = unsafe {
                 storage.downcast_mut::<SparseSet<EntityId,T>>()
             };
-            sparse_set.add(self.id,component);
+            sparse_set.insert(self.id,component);
         }
         for mut group in world.groups(type_id) {
             match &mut *group {
@@ -152,35 +152,6 @@ impl<'a> Entities<'a> {
             ids,
             borrow_entity_manager,
         }
-    }
-
-    /// Attach components to all entities
-    /// # Panics
-    /// * Panics if ```T``` has not been registered
-    /// * Panics if ```components.len()``` is not equal to the count of entities
-    pub fn attach<T,C>(self,components: C) -> Self
-    where T : Component,
-          C : Into<Vec<T>>{
-        // ensure the slice length is equal to the entity count
-        let count = self.ids.end.get() - self.ids.start.get();
-        let components : Vec<T> = components.into();
-        assert_eq!(components.len(),count);
-        let type_id = TypeId::of::<T>();
-        let mut sparse_set = self.world.raw_storage_write(type_id)
-            .expect("Entities:Cannot attach component because components has not been registered.");
-        // Safety:
-        // sparse_set is SparseSet<EntityId,T>
-        let sparse_set = unsafe {
-            sparse_set.downcast_mut::<SparseSet<EntityId,T>>()
-        };
-        // create Id slice
-        let ids = (self.ids.start.get()..self.ids.end.get())
-            // Safety:
-            // Safe here id cannot be zero 
-            .map(|id|unsafe{EntityId::new_unchecked(id)})
-            .collect::<Vec<_>>();
-        sparse_set.add_batch(&ids,components);
-        self
     }
 
     /// Get ID range

@@ -67,7 +67,7 @@ impl<'a,A : Component,B : Component> Iterator for IterRefRef<'a,A,B> {
             // Safety:
             // Safe here, because we checked before.
             let id = *unsafe {
-                sparse_set_a.entities()
+                sparse_set_a.ids()
                     .get_unchecked(self.index)
             };
             let data_a = unsafe {
@@ -120,7 +120,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterRefRef<'a,A,B> {
             // Safety:
             // Safe here, because we checked before.
             let id = *unsafe {
-                sparse_set_a.entities()
+                sparse_set_a.ids()
                     .get_unchecked(self.index)
             };
             let data_a = unsafe {
@@ -208,7 +208,7 @@ impl<'a,A : Component,B : Component> Iterator for IterRefMut<'a,A,B> {
             // Safety:
             // Safe here, because we checked before.
             let id = *unsafe {
-                sparse_set_a.entities()
+                sparse_set_a.ids()
                     .get_unchecked(self.index)
             };
             let data_a = unsafe {
@@ -261,7 +261,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterRefMut<'a,A,B> {
             // Safety:
             // Safe here, because we checked before.
             let id = *unsafe {
-                sparse_set_a.entities()
+                sparse_set_a.ids()
                     .get_unchecked(self.index)
             };
             let data_a = unsafe {
@@ -351,7 +351,7 @@ impl<'a,A : Component,B : Component> Iterator for IterMutRef<'a,A,B> {
             // Safety:
             // Safe here, because we checked before.
             let id = *unsafe {
-                sparse_set_a.entities()
+                sparse_set_a.ids()
                     .get_unchecked(self.index)
             };
             let data_a = unsafe {
@@ -404,7 +404,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutRef<'a,A,B> {
             // Safety:
             // Safe here, because we checked before.
             let id = *unsafe {
-                sparse_set_a.entities()
+                sparse_set_a.ids()
                     .get_unchecked(self.index)
             };
             let data_a = unsafe {
@@ -492,7 +492,7 @@ impl<'a,A : Component,B : Component> Iterator for IterMutMut<'a,A,B> {
             // Safety:
             // Safe here, because we checked before.
             let id = *unsafe {
-                sparse_set_a.entities()
+                sparse_set_a.ids()
                     .get_unchecked(self.index)
             };
             let data_a = unsafe {
@@ -545,7 +545,7 @@ impl<'a,A : Component,B : Component> QueryIterator for IterMutMut<'a,A,B> {
             // Safety:
             // Safe here, because we checked before.
             let id = *unsafe {
-                sparse_set_a.entities()
+                sparse_set_a.ids()
                     .get_unchecked(self.index)
             };
             let data_a = unsafe {
