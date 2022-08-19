@@ -81,6 +81,7 @@ mod entity;
 mod component;
 mod system;
 mod resource;
+mod range_vec;
 /// Some things to accelerate the iteration
 pub mod group;
 /// The query functions

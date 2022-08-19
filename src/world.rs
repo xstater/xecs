@@ -1,5 +1,6 @@
+use crate::EntityId;
 use crate::component::{Component, ComponentRead, ComponentStorage, ComponentWrite, StorageRead, StorageWrite};
-use crate::entity::{Entity, EntityId, EntityManager, Entities};
+use crate::entity::{Entity, Entities, EntityManager};
 use crate::group::Group;
 use crate::query::{QueryIterator, Queryable};
 use crate::resource::{Resource, ResourceRead, ResourceWrite};
@@ -11,7 +12,7 @@ use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// World is the core of XECS.It manages all components and entities
 pub struct World {
-    entity_manager: RwLock<EntityManager>,
+    entity_manager: RwLock<Box<dyn EntityManager>>,
     // Box<SparseSet<EntityId,Component>>
     components: HashMap<TypeId,RwLock<Box<dyn ComponentStorage>>>,
     groups: Vec<RwLock<Group>>,
@@ -22,7 +23,7 @@ impl World {
     /// Create a empty world.
     pub fn new() -> World {
         World {
-            entity_manager: RwLock::new(EntityManager::new()),
+            entity_manager: RwLock::new(Box::new(crate::entity::recycle_manager::EntityManager::new())),
             components: Default::default(),
             groups: Default::default(),
             resources : Default::default()
@@ -356,8 +357,9 @@ impl World {
 
 impl Debug for World {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let entities = self.entity_manager.read();
         f.debug_struct("World")
-            .field("entities", &self.entity_manager)
+            .field("entities",&entities.entities().collect::<Vec<_>>())
             .field(
                 "components",
                 &self.components.keys().cloned().collect::<Vec<TypeId>>(),
