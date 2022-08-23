@@ -61,11 +61,12 @@ impl RangeVec {
             // When entered this branch, the need_merge_indices cannot be empty.
             let first_index = need_merge_indices.first().copied().unwrap();
             // iterate from back so that we can remove it one by one
-            for index in need_merge_indices {
+            for index in need_merge_indices.into_iter().rev() {
                 // # Panic safety
                 // index is from big to small.
                 // Remove make all indices behind invalid
                 let current = self.ranges.remove(index);
+                dbg!(index);
                 dbg!(&current);
                 // # Safety
                 // we have checked the overlap and connected before
