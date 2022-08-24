@@ -44,45 +44,41 @@ impl RangeSet {
 
     /// insert range into RangeVec
     pub fn insert_range(&mut self, range: Range<usize>) {
-        // binary search the index that the range will be insert
-        let result = self
-            .ranges
-            .binary_search_by_key(&range.start, |range| range.start);
-        let insert_index = match result {
+        // binary search the end points 
+        let left_result = self.ranges
+            .binary_search_by_key(&range.start, |range|range.start);
+        let right_result = self.ranges
+            .binary_search_by_key(&range.end, |range|range.end);
+        let mut left_index = match left_result {
+            Ok(index) => index,
+            Err(index) => index.checked_sub(1).unwrap_or(0),
+        };
+        let mut right_index = match right_result {
             Ok(index) => index + 1,
             Err(index) => index,
         };
-        // check the ranges around `index` whether they can be merged
-        let mut need_merged_range = insert_index..insert_index;
-        // check the previous one
-        if insert_index > 0 {
-            let prev_index = insert_index - 1;
-            if let Some(prev) = self.ranges.get(prev_index) {
-                if need_merged(prev, &range) {
-                    need_merged_range = prev_index..prev_index;
-                }
+        // ckeck ranges in the end points can be merged
+        if let Some(left) = (&self.ranges[left_index..right_index]).first() {
+            if !need_merged(left, &range) {
+                left_index += 1;
             }
         }
-        // check the remain
-        for maybe_need_merge in &self.ranges[need_merged_range.start..]{
-            if need_merged(maybe_need_merge, &range) {
-                need_merged_range.end += 1;
-            } else {
-                break;
+        if let Some(right) = (&self.ranges[left_index..right_index]).last() {
+            if !need_merged(right, &range) {
+                right_index = right_index.checked_sub(1).unwrap_or(0);
             }
         }
-        // Remove all ranges and merge them into `range`
-        // remove them from back
+        // merge these ranges
         let mut range = range;
-        for index in need_merged_range.clone().rev() {
-            // this cannot be unwrap
+        for index in (left_index..right_index).rev() {
+            // # Unwrap
+            // 
             let removed = self.ranges.remove(index);
             // # Safety
-            // * removed and range is need_merged
-            range = unsafe { merge(removed, range) };
+            // 
+            range = unsafe { merge(range,removed) };
         }
-        // Insert the result range to the first index of removed range
-        self.ranges.insert(need_merged_range.start, range);
+        self.ranges.insert(left_index,range);
     }
 
     pub fn insert(&mut self, data: usize) {
