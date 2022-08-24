@@ -12,7 +12,15 @@ keywords = ["gamedev","ecs","game-engine"]
 categories = ["game-development","game-engines"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# cargo build --profile=release-with-debug
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+
 [dependencies]
 parking_lot = "0.12"
 futures = "0.3"
 xsparseset = "0.2"
+
+[dev-dependencies]
+rand = "0.8"
