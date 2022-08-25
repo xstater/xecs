@@ -8,6 +8,12 @@ struct Node {
     right: Option<Box<Node>>,
 }
 
+/// check r1 is inlucde in r2
+#[inline]
+fn include(r1: &Range<usize>, r2: &Range<usize>) -> bool {
+    r2.start <= r1.start && r1.end <= r2.end
+}
+
 impl Node {
     fn new(range: Range<usize>) -> Node {
         // Use u128 to avoid overflow
@@ -40,6 +46,10 @@ impl Node {
 
     fn insert(&mut self, range: Range<usize>) {
         if self.range == range {
+            return;
+        }
+        // buggy
+        if self.is_leaf() && include(&range, &self.range) {
             return;
         }
 
@@ -76,7 +86,19 @@ impl Node {
         } else {
             unreachable!();
         }
-        // combine all leve
+        // combine leaves
+        let mut need_combine = false;
+        if let Some(left) = &self.left { 
+            if let Some(right) = &self.right {
+                if left.is_leaf() && right.is_leaf() {
+                    need_combine = true;
+                }
+            }
+        }
+        if need_combine {
+            self.left.take();
+            self.right.take();
+        }
     }
 }
 
@@ -172,7 +194,7 @@ mod tests {
         let mut values = Vec::new();
         let mut segs_tree = SegsTree::new();
 
-        let count = 1_000_000;
+        let count = 100_000;
         for _ in 0..count {
             let value = rng.gen_range(0..1000000);
             values.push(value);
