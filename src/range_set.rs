@@ -115,6 +115,9 @@ fn insert(node: &mut Option<Box<Node>>, range: Range<usize>, node_range: Range<u
 }
 
 fn remove(raw_node: &mut Option<Box<Node>>, range: Range<usize>) {
+    if range.start >= range.end {
+        return;
+    }
     if let Some(node) = raw_node {
         if node.is_leaf() {
             if node.range == range {
@@ -180,6 +183,28 @@ fn remove(raw_node: &mut Option<Box<Node>>, range: Range<usize>) {
     }
 }
 
+fn has(node: &Option<Box<Node>>, range: Range<usize>) -> bool {
+    if range.start >= range.end {
+        return false;
+    }
+    if let Some(node) = node {
+        if node.is_leaf() {
+            return true;
+        } else {
+            let middle = node.middle;
+            if range.start < middle && middle < range.end {
+                return has(&node.left, range.start..middle) && has(&node.right, middle..range.end);
+            } else if range.end <= middle {
+                return has(&node.left, range);
+            } else if middle <= range.start {
+                return has(&node.right, range);
+            }
+            unreachable!()
+        }
+    } 
+    false
+}
+
 #[derive(Debug)]
 pub struct RangeSet {
     root: Option<Box<Node>>,
@@ -204,6 +229,14 @@ impl RangeSet {
 
     pub fn remove(&mut self, data: usize) {
         self.remove_range(data..(data + 1))
+    }
+
+    pub fn contains_range(&self, range: Range<usize>) -> bool {
+        has(&self.root, range)
+    }
+
+    pub fn contains(&self, data: usize) -> bool {
+        self.contains_range(data..(data + 1))
     }
 }
 
@@ -512,8 +545,8 @@ mod tests {
                 }
             } else {
                 // 40% chance to excute a remove
-                segs_tree.remove_range(value..(value+len));
-                for i in value..(value+len) {
+                segs_tree.remove_range(value..(value + len));
+                for i in value..(value + len) {
                     values.remove(&i);
                 }
             }
@@ -524,5 +557,27 @@ mod tests {
         for (a, b) in values.into_iter().zip(s.into_iter()) {
             assert_eq!(a, b)
         }
+    }
+
+    #[test]
+    fn contains_test() {
+        let mut rng = rand::thread_rng();
+        let mut values = Vec::new();
+        let mut segs_tree = RangeSet::new();
+
+        let count = 100_000;
+        for _ in 0..count {
+            let value = rng.gen_range(0..1000000);
+            values.push(value);
+            segs_tree.insert(value);
+        }
+
+        values.sort_unstable();
+        values.dedup();
+
+        values.into_iter().for_each(|value| {
+            assert!(segs_tree.contains(value));
+        });
+
     }
 }
