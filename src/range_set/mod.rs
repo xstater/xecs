@@ -48,20 +48,6 @@ impl Node {
     fn is_leaf(&self) -> bool {
         self.left.is_none() && self.right.is_none()
     }
-
-    #[inline]
-    fn create_left(&mut self) -> &mut Box<Node> {
-        let left = Node::new(self.range.start..self.middle);
-        self.left.replace(Box::new(left));
-        self.left.as_mut().unwrap_or_else(|| unreachable!())
-    }
-
-    #[inline]
-    fn create_right(&mut self) -> &mut Box<Node> {
-        let right = Node::new(self.middle..self.range.end);
-        self.right.replace(Box::new(right));
-        self.right.as_mut().unwrap_or_else(|| unreachable!())
-    }
 }
 
 fn insert(node: &mut Option<Box<Node>>, range: Range<usize>, node_range: Range<usize>) {
