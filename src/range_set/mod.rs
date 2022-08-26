@@ -5,6 +5,8 @@ pub use iter::IntoIter;
 
 use std::ops::Range;
 
+use self::iter::Iter;
+
 #[derive(Debug)]
 struct Node {
     range: Range<usize>,
@@ -242,5 +244,9 @@ impl RangeSet {
 
     pub fn contains(&self, data: usize) -> bool {
         self.contains_range(data..(data + 1))
+    }
+
+    pub fn iter(&self) -> Iter<'_> {
+        (&self).into_iter()
     }
 }
