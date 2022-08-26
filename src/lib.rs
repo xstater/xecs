@@ -82,7 +82,6 @@ mod component;
 mod system;
 mod resource;
 mod range_set;
-mod segs_tree;
 /// Some things to accelerate the iteration
 pub mod group;
 /// The query functions
