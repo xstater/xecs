@@ -44,61 +44,55 @@ impl Node {
         self.right.as_mut().unwrap_or_else(|| unreachable!())
     }
 
-    fn insert(&mut self, range: Range<usize>) {
-        if self.range == range {
+}
+
+fn insert(node: &mut Option<Box<Node>>, range: Range<usize>, node_range: Range<usize>) {
+    let node = if let Some(node) = node {
+        // already has a node
+        // and its a leaf
+        // and include this range
+        // we don't need insert it again
+        if node.is_leaf() && include(&range, &node_range) {
             return;
         }
-        // buggy
-        if self.is_leaf() && include(&range, &self.range) {
+        node
+    } else {
+        if node_range.start >= node_range.end {
             return;
         }
-
-        let middle = self.middle;
-
-        if range.start < middle && middle < range.end {
-            let left = if let Some(left) = &mut self.left {
-                left
-            } else {
-                self.create_left()
-            };
-            left.insert(range.start..middle);
-
-            let right = if let Some(right) = &mut self.right {
-                right
-            } else {
-                self.create_right()
-            };
-            right.insert(middle..range.end);
-        } else if range.end <= middle {
-            let left = if let Some(left) = &mut self.left {
-                left
-            } else {
-                self.create_left()
-            };
-            left.insert(range);
-        } else if middle <= range.start {
-            let right = if let Some(right) = &mut self.right {
-                right
-            } else {
-                self.create_right()
-            };
-            right.insert(range);
-        } else {
-            unreachable!();
+        let new_node = Node::new(node_range.clone());
+        node.replace(Box::new(new_node));
+        if range == node_range {
+            return ;
         }
-        // combine leaves
-        let mut need_combine = false;
-        if let Some(left) = &self.left { 
-            if let Some(right) = &self.right {
-                if left.is_leaf() && right.is_leaf() {
-                    need_combine = true;
-                }
+        node.as_mut().unwrap_or_else(|| unreachable!())
+    };
+
+    let middle = node.middle;
+
+    if range.start < middle && middle < range.end {
+        insert( &mut node.left, range.start..middle, node_range.start..middle);
+        insert(&mut node.right, middle..range.end, middle..node_range.end);
+    } else if range.end <= middle {
+        insert(&mut node.left, range, node_range.start..middle);
+    } else if middle <= range.start {
+        insert(&mut node.right, range, middle..node_range.end);
+    } else {
+        unreachable!();
+    }
+
+    // combine
+    let mut need_combine = false;
+    if let Some(left) = &node.left {
+        if let Some(right) = &node.right {
+            if left.is_leaf() && right.is_leaf() {
+                need_combine = true;
             }
         }
-        if need_combine {
-            self.left.take();
-            self.right.take();
-        }
+    }
+    if need_combine {
+        node.left.take();
+        node.right.take();
     }
 }
 
@@ -113,19 +107,11 @@ impl SegsTree {
     }
 
     pub fn insert_range(&mut self, range: Range<usize>) {
-        let root = if let Some(root) = &mut self.root {
-            root
-        } else {
-            let root = Box::new(Node::new(0..std::usize::MAX));
-            self.root.replace(root);
-            self.root.as_mut().unwrap_or_else(|| unreachable!())
-        };
-
-        root.insert(range)
+        insert(&mut self.root, range, 0..std::usize::MAX);
     }
 
     pub fn insert(&mut self, data: usize) {
-        self.insert_range(data..(data+1));
+        self.insert_range(data..(data + 1));
     }
 }
 
@@ -177,7 +163,7 @@ impl IntoIterator for SegsTree {
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIter {
-            stack: self.root.map(|root|vec![root]).unwrap_or(vec![]),
+            stack: self.root.map(|root| vec![root]).unwrap_or(vec![]),
             range: None,
         }
     }
@@ -185,8 +171,50 @@ impl IntoIterator for SegsTree {
 
 #[cfg(test)]
 mod tests {
+    use super::{SegsTree, insert};
     use rand::Rng;
-    use super::SegsTree;
+
+    #[test]
+    fn basic_test() {
+        // basic insert test
+        let mut root = None;
+        insert(&mut root, 0..5, 0..10);
+        assert!(root.is_some());
+        {
+            let root = root.as_ref().unwrap();
+            assert_eq!(root.range, 0..10);
+            assert!(root.left.is_some());
+            assert!(root.right.is_none());
+            {
+                let left = root.left.as_ref().unwrap();
+                assert_eq!(left.range,0..5);
+                assert!(left.is_leaf());
+            }
+        }
+        // insert a short range
+        // this has no effect
+        insert(&mut root, 2..3, 0..10);
+        assert!(root.is_some());
+        {
+            let root = root.as_ref().unwrap();
+            assert_eq!(root.range, 0..10);
+            assert!(root.left.is_some());
+            assert!(root.right.is_none());
+            {
+                let left = root.left.as_ref().unwrap();
+                assert_eq!(left.range,0..5);
+                assert!(left.is_leaf());
+            }
+        }
+        // combine test
+        insert(&mut root, 5..10, 0..10);
+        assert!(root.is_some());
+        {
+            let root = root.as_ref().unwrap();
+            assert_eq!(root.range, 0..10);
+            assert!(root.is_leaf());
+        }
+    }
 
     #[test]
     fn rand_test() {
