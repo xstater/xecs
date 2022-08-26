@@ -358,6 +358,22 @@ impl World {
     ) -> Box<dyn QueryIterator<Item = <T as Queryable>::Item> + 'a> {
         <T as Queryable<'a>>::query(self)
     }
+
+    /// Get all id in world
+    /// # Performance
+    /// * This may be slow because it need to iterate all id and collect them
+    pub fn entities(&self) -> Vec<EntityId> {
+        let gurad = self.entity_manager.read();
+        gurad.entities().collect()
+    }
+    
+    /// Get the count of entities in world
+    /// # Performance
+    /// * This may be slow because it need to iterate all entities
+    pub fn count(&self) -> usize {
+        let guard = self.entity_manager.read();
+        guard.len()
+    }
 }
 
 impl Debug for World {
@@ -376,7 +392,6 @@ impl Debug for World {
 #[cfg(test)]
 mod tests {
     use crate::component::Component;
-    use crate::entity::EntityId;
     use crate::group::{full_owning, non_owning, partial_owning};
     use crate::query::WithId;
     use crate::world::World;
