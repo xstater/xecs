@@ -52,12 +52,12 @@ impl EntityManager {
         self.entities.iter().count()
     }
 
-    pub fn entities(&self) -> Box<dyn Iterator<Item=EntityId> + '_> {
-        Box::new(self.entities.iter().map(|id| unsafe {
+    pub fn entities(&self) -> impl Iterator<Item = EntityId> + '_{
+        self.entities.iter().map(|id| unsafe {
             // # Safety
             // id cannot be zero
             EntityId::new_unchecked(id)
-        }))
+        })
     }
 }
 
