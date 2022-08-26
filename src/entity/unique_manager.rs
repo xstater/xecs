@@ -1,24 +1,22 @@
-use std::ops::Range;
+use crate::{EntityId, range_set::RangeSet};
 
-use crate::EntityId;
-
-#[derive(Debug,Clone)]
+#[derive(Debug)]
 pub struct EntityManager {
     next_id: usize,
-    entities: Vec<Range<usize>>
+    entities: RangeSet
 }
 
 impl EntityManager {
     pub fn new() -> EntityManager {
         EntityManager{
             next_id: 1,
-            entities: Vec::new(),
+            entities: RangeSet::new(),
         }
     }
 }
 
-impl super::EntityManager for EntityManager {
-    fn allocate(&mut self) -> EntityId {
+impl EntityManager {
+    pub fn allocate(&mut self) -> EntityId {
         // # Safety
         // * next_id is start from 1
         // * next_id is always increased
@@ -26,27 +24,47 @@ impl super::EntityManager for EntityManager {
         let id = unsafe {
             super::EntityId::new_unchecked(self.next_id)
         };
+        self.entities.insert(id.get());
         self.next_id += 1;
         id
     }
 
-    fn allocate_n(&mut self,count: usize) -> std::ops::Range<EntityId> {
-        todo!()
+    pub fn allocate_n(&mut self,count: usize) -> std::ops::Range<EntityId> {
+        let start = super::EntityId::new(self.next_id)
+            .unwrap_or_else(|| unreachable!("EntityId Cannot be Zero"));
+        self.next_id += count;
+        let end = super::EntityId::new(self.next_id)
+            .unwrap_or_else(|| unreachable!("EntityId Cannot be Zero"));
+        self.entities.remove_range(start.get()..end.get());
+        start..end
     }
 
-    fn remove(&mut self,id: EntityId) {
-        todo!()
+    pub fn remove(&mut self,id: EntityId) {
+        self.entities.remove(id.get());
     }
 
-    fn has(&self,id: EntityId) -> bool {
-        todo!()
+    pub fn has(&self,id: EntityId) -> bool {
+        self.entities.contains(id.get())
     }
 
-    fn len(&self) -> usize {
-        todo!()
+    pub fn len(&self) -> usize {
+        // super slow
+        self.entities.iter().count()
     }
 
-    fn entities(&self) -> Box<dyn Iterator<Item=EntityId> + '_> {
-        todo!()
+    pub fn entities(&self) -> Box<dyn Iterator<Item=EntityId> + '_> {
+        Box::new(self.entities.iter().map(|id| unsafe {
+            // # Safety
+            // id cannot be zero
+            EntityId::new_unchecked(id)
+        }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn basic_test() {
+
     }
 }
