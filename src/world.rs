@@ -11,6 +11,7 @@ use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::ops::Range;
 
 /// World is the core of XECS.It manages all components and entities
 pub struct World {
@@ -93,7 +94,11 @@ impl World {
             entity_manager.allocate_n(count)
         };
         let entity_manager = self.entity_manager.read();
-        Entities::new(self, ids, entity_manager)
+        // # Safety
+        // * ids are created just now. They must be valid
+        unsafe {
+            Entities::new(self, ids, entity_manager)
+        }
     }
 
     /// Remove entity and its components.
@@ -259,6 +264,14 @@ impl World {
         }
     }
 
+    /// Get `Entities` from a range of id
+    /// # Safety
+    /// * Safe when all ids in range are valid
+    pub unsafe fn entities(&self, id_range: Range<EntityId>) -> Entities<'_> {
+        let  entity_manager= self.entity_manager.read();
+        Entities::new(self, id_range, entity_manager)
+    }
+
     /// Make a [group](crate::group) to accelerate the iteration.
     /// ## Panics
     /// * Panic if ```group``` is the same as another group in [World](crate::world::World).
@@ -362,7 +375,7 @@ impl World {
     /// Get all id in world
     /// # Performance
     /// * This may be slow because it need to iterate all id and collect them
-    pub fn entities(&self) -> Vec<EntityId> {
+    pub fn entity_ids(&self) -> Vec<EntityId> {
         let gurad = self.entity_manager.read();
         gurad.entities().collect()
     }

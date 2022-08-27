@@ -153,7 +153,7 @@ pub struct Entities<'a> {
 }
 
 impl<'a> Entities<'a> {
-    pub(crate) fn new(
+    pub(crate) unsafe fn new(
         world: &'a World,
         ids: Range<EntityId>,
         borrow_entity_manager: RwLockReadGuard<'a, EntityManager>,
@@ -172,27 +172,26 @@ impl<'a> Entities<'a> {
     pub fn attach<T,C>(self,components: C) -> Self
     where T : Component,
           C : Into<Vec<T>>{
-        // // ensure the slice length is equal to the entity count
-        // let count = self.ids.end.get() - self.ids.start.get();
-        // let components : Vec<T> = components.into();
-        // assert_eq!(components.len(),count);
-        // let type_id = TypeId::of::<T>();
-        // let mut sparse_set = self.world.raw_storage_write(type_id)
-        //     .expect("Entities:Cannot attach component because components has not been registered.");
-        // // Safety:
-        // // sparse_set is SparseSet<EntityId,T>
-        // let sparse_set = unsafe {
-        //     sparse_set.downcast_mut::<SparseSet<EntityId,T>>()
-        // };
-        // // create Id slice
-        // let ids = (self.ids.start.get()..self.ids.end.get())
-        //     // Safety:
-        //     // Safe here id cannot be zero 
-        //     .map(|id|unsafe{EntityId::new_unchecked(id)})
-        //     .collect::<Vec<_>>();
-        // sparse_set.add_batch(&ids,components);
-        // self
-        todo!()
+        // ensure the slice length is equal to the entity count
+        let count = self.ids.end.get() - self.ids.start.get();
+        let mut components : Vec<T> = components.into();
+        assert_eq!(components.len(),count);
+        let type_id = TypeId::of::<T>();
+        let mut sparse_set = self.world.raw_storage_write(type_id)
+            .expect("Entities:Cannot attach component because components has not been registered.");
+        // Safety:
+        // sparse_set is SparseSet<EntityId,T>
+        let sparse_set = unsafe {
+            sparse_set.downcast_mut::<SparseSet<EntityId,T>>()
+        };
+        // create Id slice
+        let mut ids = (self.ids.start.get()..self.ids.end.get())
+            // Safety:
+            // Safe here id cannot be zero 
+            .map(|id|unsafe{EntityId::new_unchecked(id)})
+            .collect::<Vec<_>>();
+        sparse_set.insert_batch(&mut ids, &mut components);
+        self
     }
 
     /// Get ID range
