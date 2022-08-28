@@ -18,6 +18,10 @@ impl World {
             storages: HashMap::new(),
         }
     }
+
+    pub fn register_with_storage<S: ComponentStorage>(&mut self,storage: S) -> StorageId {
+        todo!()
+    }
     
     pub fn register<T: Component>(&mut self) -> StorageId {
         todo!()
