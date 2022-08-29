@@ -65,3 +65,34 @@ impl World {
     }
 
 }
+
+#[cfg(test)]
+mod tests {
+    use xsparseset::SparseSet;
+
+    use crate::{World, EntityId};
+
+    #[test]
+    fn register_test() {
+        let mut world = World::new();
+
+        let id_i32 = world.register::<i32>();
+        assert!(world.has_registered(id_i32));
+        let id_char = World::get_rust_storage_id::<char>();
+        assert!(!world.has_registered(id_char));
+        let storage_char: SparseSet<EntityId, char, xsparseset::VecStorage<EntityId>> = SparseSet::default();
+        world.register_with_storage(id_char, storage_char);
+        assert!(world.has_registered(id_char));
+
+        let ids = (0..10).map(|_|{
+            let id = world.allocate_other_storage_id();
+            let storage: SparseSet<EntityId, char, xsparseset::VecStorage<EntityId>> = SparseSet::default();
+            world.register_with_storage(id, storage);
+            id
+        }).collect::<Vec<_>>();
+
+        for id in ids.iter().copied() {
+            assert!(world.has_registered(id));
+        }
+    }
+}
