@@ -55,6 +55,21 @@ where
     }
 }
 
+impl dyn 'static + ComponentStorage {
+    /// Downcast `&dyn ComponentStorage` to `&T`
+    /// # Safety
+    /// * Safe when `self` has type `T`
+    pub unsafe fn downcast_ref<T: ComponentStorage>(&self) -> &T {
+        &*(self as *const dyn ComponentStorage as *const T)
+    }
+
+    /// Downcast `&mut dyn ComponentStorage` to `&mut T`
+    /// # Safety
+    /// * Safe when `self` has type `T`
+    pub unsafe fn downcast_mut<T: ComponentStorage>(&mut self) -> &mut T {
+        &mut *(self as *mut dyn ComponentStorage as *mut T)
+    }
+}
 /// A Read lock gurad for Component Storage
 pub struct StorageRead<'a> {
     lock: RwLockReadGuard<'a,Box<dyn ComponentStorage>>
