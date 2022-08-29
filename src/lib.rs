@@ -1,6 +1,7 @@
 mod world;
 mod storage;
 mod entity;
+mod range_set;
 
 use std::{num::NonZeroUsize, any::TypeId};
 
