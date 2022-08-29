@@ -5,7 +5,7 @@ use xsparseset::SparseSet;
 
 use crate::{
     storage::{ComponentStorage, StorageRead, StorageWrite},
-    Component, EntityId, StorageId,
+    Component, EntityId, StorageId, Entity,
 };
 
 /// The core of XECS
@@ -83,6 +83,12 @@ impl World {
     pub fn storage_write(&self, storage_id: StorageId) -> Option<StorageWrite<'_>> {
         let lock = self.storages.get(&storage_id)?.write();
         Some(StorageWrite::from_gurad(lock))
+    }
+
+    /// Create an empty entity and return a `Entity` which can 
+    /// manuiplate the entity conveniently
+    pub fn create_entity<T: Component>(&self) -> Entity<'_> {
+        todo!()
     }
 }
 

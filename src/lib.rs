@@ -1,10 +1,12 @@
 mod world;
 mod storage;
+mod entity;
 
 use std::{num::NonZeroUsize, any::TypeId};
 
 pub use world::World;
 pub use storage::ComponentStorage;
+pub use entity::Entity;
 
 /// An id represent an entity, it's just a `NonZeroUsize`
 pub type EntityId = NonZeroUsize;
