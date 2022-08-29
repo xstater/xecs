@@ -22,7 +22,7 @@ impl EntityManager {
         // * next_id is always increased
         // * overflow a usize will panic, it cannot be here with next_id = 0
         let id = unsafe {
-            super::EntityId::new_unchecked(self.next_id)
+            EntityId::new_unchecked(self.next_id)
         };
         self.entities.insert(id.get());
         self.next_id += 1;
@@ -30,10 +30,10 @@ impl EntityManager {
     }
 
     pub fn allocate_n(&mut self,count: usize) -> std::ops::Range<EntityId> {
-        let start = super::EntityId::new(self.next_id)
+        let start = EntityId::new(self.next_id)
             .unwrap_or_else(|| unreachable!("EntityId Cannot be Zero"));
         self.next_id += count;
-        let end = super::EntityId::new(self.next_id)
+        let end = EntityId::new(self.next_id)
             .unwrap_or_else(|| unreachable!("EntityId Cannot be Zero"));
         self.entities.remove_range(start.get()..end.get());
         start..end
