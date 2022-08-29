@@ -39,7 +39,7 @@ impl EntityManager {
         start..end
     }
 
-    pub fn remove(&mut self,id: EntityId) {
+    pub fn deallocate(&mut self,id: EntityId) {
         self.entities.remove(id.get());
     }
 
