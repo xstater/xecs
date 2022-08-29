@@ -51,3 +51,7 @@ where
         todo!()
     }
 }
+
+pub struct StorageRead<'a> {
+    
+}
