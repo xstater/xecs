@@ -65,6 +65,6 @@ impl EntityManager {
 mod tests {
     #[test]
     fn basic_test() {
-
+        todo!("add test for manager");
     }
 }
