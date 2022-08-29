@@ -1,8 +1,6 @@
 use std::ops::{Deref, DerefMut};
-
 use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
 use xsparseset::{SparseSet, SparseStorage};
-
 use crate::{Component, EntityId};
 
 /// A trait to make sparse set dynamic  
