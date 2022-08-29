@@ -6,6 +6,7 @@ use std::{num::NonZeroUsize, any::TypeId};
 pub use world::World;
 pub use storage::ComponentStorage;
 
+/// An id represent an entity, it's just a `NonZeroUsize`
 pub type EntityId = NonZeroUsize;
 
 /// An ID allocated by World.  
@@ -19,6 +20,7 @@ pub enum StorageId {
     Other(u32)
 }
 
+/// Component in XECS is just anything that implements `Send + Sync`
 pub trait Component: Send + Sync + 'static {}
 impl<T> Component for T
 where T: Send + Sync + 'static {}

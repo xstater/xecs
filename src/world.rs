@@ -8,13 +8,14 @@ use crate::{
     Component, EntityId, StorageId,
 };
 
+/// The core of XECS
 pub struct World {
     next_other_storage_id: u32,
     storages: HashMap<StorageId, RwLock<Box<dyn ComponentStorage>>>,
 }
 
 impl World {
-    // Create a new empty World
+    /// Create a new empty World
     pub fn new() -> Self {
         World {
             next_other_storage_id: 0,
