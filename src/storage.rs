@@ -48,10 +48,10 @@ where
     }
 
     fn count(&self) -> usize {
-        todo!()
+        self.len()
     }
 }
 
-pub struct StorageRead<'a> {
+// pub struct StorageRead<'a> {
     
-}
+// }
