@@ -5,13 +5,14 @@ use xsparseset::SparseSet;
 
 use crate::{
     storage::{ComponentStorage, StorageRead, StorageWrite},
-    Component, EntityId, StorageId, Entity,
+    Component, EntityId, StorageId, Entity, entity::EntityManager,
 };
 
 /// The core of XECS
 pub struct World {
     next_other_storage_id: u32,
     storages: HashMap<StorageId, RwLock<Box<dyn ComponentStorage>>>,
+    entities: RwLock<EntityManager>
 }
 
 impl World {
@@ -20,6 +21,7 @@ impl World {
         World {
             next_other_storage_id: 0,
             storages: HashMap::new(),
+            entities: RwLock::new(EntityManager::new())
         }
     }
 
