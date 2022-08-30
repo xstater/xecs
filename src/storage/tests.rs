@@ -13,8 +13,8 @@ fn basic_storage_dyn() {
     let id = EntityId::new(10).unwrap();
     let data: Box<dyn ComponentAny> = Box::new('c');
     sparse_set.insert_any(id, data);
-    assert_eq!(sparse_set.count(), 1);
-    assert!(sparse_set.has(id));
+    assert_eq!(sparse_set.len(), 1);
+    assert!(sparse_set.contains(id));
     {
         let sparse_set = unsafe { sparse_set.downcast_ref::<SparseSetHashMap<EntityId,char>>() };
         let result = sparse_set.get(id).copied();
@@ -28,8 +28,8 @@ fn basic_storage_dyn() {
     unsafe {
         sparse_set.insert_any_unchecked(id, &mut ch as *mut char as *mut _);
     }
-    assert_eq!(sparse_set.count(), 2);
-    assert!(sparse_set.has(id));
+    assert_eq!(sparse_set.len(), 2);
+    assert!(sparse_set.contains(id));
     {
         let sparse_set = unsafe { sparse_set.downcast_ref::<SparseSetHashMap<EntityId,char>>() };
         let result = sparse_set.get(id).copied();
@@ -78,7 +78,7 @@ fn rand_storage_dyn() {
         }
     }
 
-    assert_eq!(sparse_set.count(),ids.len());
+    assert_eq!(sparse_set.len(),ids.len());
     {
         let sparse_set = unsafe {
             sparse_set.downcast_ref::<SparseSetHashMap<EntityId,String>>()
@@ -133,7 +133,7 @@ fn storage_dyn_drop_test() {
         }
     }
 
-    let count = sparse_set.count();
+    let count = sparse_set.len();
     // trig drop
     std::mem::drop(sparse_set);
     
