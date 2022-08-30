@@ -4,15 +4,16 @@ use parking_lot::RwLock;
 use xsparseset::SparseSet;
 
 use crate::{
+    entity::EntityManager,
     storage::{ComponentStorage, StorageRead, StorageWrite},
-    Component, EntityId, StorageId, Entity, entity::EntityManager,
+    Component, Entity, EntityId, StorageId,
 };
 
 /// The core of XECS
 pub struct World {
     next_other_storage_id: u32,
     storages: HashMap<StorageId, RwLock<Box<dyn ComponentStorage>>>,
-    entities: RwLock<EntityManager>
+    entities: RwLock<EntityManager>,
 }
 
 impl World {
@@ -21,7 +22,7 @@ impl World {
         World {
             next_other_storage_id: 0,
             storages: HashMap::new(),
-            entities: RwLock::new(EntityManager::new())
+            entities: RwLock::new(EntityManager::new()),
         }
     }
 
@@ -87,7 +88,7 @@ impl World {
         Some(StorageWrite::from_gurad(lock))
     }
 
-    /// Create an empty entity and return a `Entity` which can 
+    /// Create an empty entity and return a `Entity` which can
     /// manuiplate the entity conveniently
     pub fn create_entity<T: Component>(&self) -> Entity<'_> {
         todo!()
@@ -149,8 +150,4 @@ mod tests {
         }
     }
 
-    #[test]
-    fn storage_insert_remove_test() {
-        
-    }
 }
