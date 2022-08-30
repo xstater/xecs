@@ -1,11 +1,17 @@
-use std::ops::{Deref, DerefMut};
+mod guards;
 
-use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
+pub use guards::{
+    StorageRead,
+    StorageWrite
+};
+use std::{
+    any::{type_name, Any, TypeId},
+    ops:: Range,
+};
 use xsparseset::{SparseSet, SparseStorage};
+use crate::{Component, ComponentAny, EntityId};
 
-use crate::{Component, EntityId};
-
-/// A trait to make sparse set dynamic  
+/// A trait to make sparse set dynamic
 pub trait ComponentStorage: Send + Sync {
     /// Check if storage has ```entity_id```
     fn has(&self, entity_id: EntityId) -> bool;
@@ -23,6 +29,14 @@ pub trait ComponentStorage: Send + Sync {
     fn is_empty(&self) -> bool {
         self.count() == 0
     }
+    /// Insert data which implements `Any` (rust type) in compoenent storage
+    /// # Panics
+    /// * This function should panic when downcast data to the type of storage failed
+    fn insert_any(&mut self, entity_id: EntityId, data: Box<dyn ComponentAny>);
+    /// Insert data without any check, can be used in pass a value on stack or FFI type
+    /// # Safety
+    /// * data must have the same type of the storage
+    unsafe fn insert_any_unchecked(&mut self, entity_id: EntityId, data: *mut u8);
 }
 
 impl<T, S> ComponentStorage for SparseSet<EntityId, T, S>
@@ -53,6 +67,34 @@ where
     fn count(&self) -> usize {
         self.len()
     }
+
+    fn is_empty(&self) -> bool {
+        Self::is_empty(&self)
+    }
+
+    fn insert_any(&mut self, entity_id: EntityId, data: Box<dyn ComponentAny>) {
+        let type_id = TypeId::of::<T>();
+        if data.type_id() != type_id {
+            panic!(
+                "insert_any() failed, because downcast to {} failed",
+                type_name::<T>()
+            );
+        }
+        // # Safety
+        // * we checked the type before ,so the casting is safe
+        let data = unsafe {
+            let ptr = Box::into_raw(data);
+            let ptr = ptr as *mut T;
+            std::ptr::read(ptr)
+        };
+        self.insert(entity_id, data);
+    }
+
+    unsafe fn insert_any_unchecked(&mut self, entity_id: EntityId, data: *mut u8) {
+        let data = data as *mut T;
+        let data = std::ptr::read(data);
+        self.insert(entity_id, data);
+    }
 }
 
 impl dyn 'static + ComponentStorage {
@@ -70,47 +112,16 @@ impl dyn 'static + ComponentStorage {
         &mut *(self as *mut dyn ComponentStorage as *mut T)
     }
 }
-/// A Read lock gurad for Component Storage
-pub struct StorageRead<'a> {
-    lock: RwLockReadGuard<'a,Box<dyn ComponentStorage>>
-}
 
-impl<'a> StorageRead<'a> {
-    pub(in crate) fn from_gurad(lock: RwLockReadGuard<'a,Box<dyn ComponentStorage>>) -> Self{
-        StorageRead { lock }
-    }
-}
+pub trait ComponentStorageStatic: ComponentStorage {
+    type Component: Component;
 
-impl Deref for StorageRead<'_> {
-    type Target = Box<dyn ComponentStorage>;
-
-    fn deref(&self) -> &Self::Target {
-        RwLockReadGuard::deref(&self.lock)
-    }
-}
-
-
-/// A Write lock gurad for Component Storage
-pub struct StorageWrite<'a> {
-    lock: RwLockWriteGuard<'a,Box<dyn ComponentStorage>>
-}
-
-impl<'a> StorageWrite<'a> {
-    pub(in crate) fn from_gurad(lock: RwLockWriteGuard<'a,Box<dyn ComponentStorage>>) -> Self{
-        StorageWrite { lock }
-    }
-}
-
-impl Deref for StorageWrite<'_> {
-    type Target = Box<dyn ComponentStorage>;
-
-    fn deref(&self) -> &Self::Target {
-        RwLockWriteGuard::deref(&self.lock)
-    }
-}
-
-impl DerefMut for StorageWrite<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        RwLockWriteGuard::deref_mut(&mut self.lock)
-    }
+    fn get(&self, entity_id: EntityId) -> &Self::Component;
+    fn get_mut(&mut self, entity_id: EntityId) -> &mut Self::Component;
+    fn data(&self) -> &[Self::Component];
+    fn data_mut(&mut self) -> &mut [Self::Component];
+    fn ids(&self) -> &[EntityId];
+    fn insert(&mut self, entity_id: EntityId, data: Self::Component);
+    fn insert_batch(&mut self,entity_ids: Range<EntityId>, data: Vec<Self::Component>);
+    fn remove(&mut self, entity_id: EntityId) -> Option<Self::Component>;
 }

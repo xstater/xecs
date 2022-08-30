@@ -3,7 +3,7 @@ mod storage;
 mod entity;
 mod range_set;
 
-use std::{num::NonZeroUsize, any::TypeId};
+use std::{num::NonZeroUsize, any::{TypeId, Any}};
 
 pub use world::World;
 pub use storage::ComponentStorage;
@@ -27,3 +27,9 @@ pub enum StorageId {
 pub trait Component: Send + Sync + 'static {}
 impl<T> Component for T
 where T: Send + Sync + 'static {}
+
+
+/// A combined trait with `Component` and `Any`
+pub trait ComponentAny: Component + Any{}
+impl<T> ComponentAny for T
+where T: ComponentAny + Any {}

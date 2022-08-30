@@ -129,7 +129,7 @@ mod tests {
     }
 
     #[test]
-    fn storage_test() {
+    fn storage_get_test() {
         let mut world = World::new();
 
         let char_id = world.register::<char>();
@@ -147,5 +147,10 @@ mod tests {
             let char_storage = char_storage.unwrap();
             char_storage.as_ref().is_empty();
         }
+    }
+
+    #[test]
+    fn storage_insert_remove_test() {
+        
     }
 }
