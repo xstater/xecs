@@ -242,6 +242,24 @@ fn concrete_insert_remove() {
 
 #[test]
 fn concrete_insert_batch() {
+    let mut rng = rand::thread_rng();
+    let sparse_set: SparseSetHashMap<EntityId, char> = SparseSet::default();
+    let mut sparse_set: Box<dyn ComponentStorage> = Box::new(sparse_set);
+
+    let mut data = Vec::new();
+
+    let count = 100_000;
+    for _ in 0..count{
+        let ch = rng.gen_range('a'..='z');
+        data.push(ch)
+    }
+    let start = 100;
+    let start = EntityId::new(start).unwrap();
+    let end = EntityId::new(start.get() + count).unwrap();
+    sparse_set.insert_batch(start..end, data.clone());
+
+    assert_eq!(sparse_set.len(),data.len());
+    assert_eq!(sparse_set.data::<char>(),&data);
 }
 
 #[test]

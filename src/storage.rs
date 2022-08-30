@@ -6,7 +6,7 @@ use crate::{Component, ComponentAny, EntityId};
 pub use guards::{StorageRead, StorageWrite};
 use std::{
     any::{type_name, TypeId},
-    ops::Range,
+    ops::Range, mem::size_of,
 };
 use xsparseset::{SparseSet, SparseStorage};
 
@@ -275,5 +275,41 @@ impl dyn ComponentStorage {
         // just forget it
         self.remove_ignored_and_forget(entity_id);
         result
+    }
+
+    /// Get the all data in storage
+    /// # Panics
+    /// * Panic if the type of `data` is not same as the type of component type in Storage
+    pub fn data<T: Component>(&self) -> &[T] {
+        let type_id = TypeId::of::<T>();
+        if type_id != self.component_type_id() {
+            panic!("Get data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
+        }
+        let data = self.data_ptr() as *const T;
+        let len = self.len();
+        // # Safety
+        // * the data has type `T`
+        // * the data has length `len`
+        unsafe {
+            std::slice::from_raw_parts(data,len)
+        }
+    }
+
+    /// Get the all mutable data in storage
+    /// # Panics
+    /// * Panic if the type of `data` is not same as the type of component type in Storage
+    pub fn data_mut<T: Component>(&mut self) -> &mut [T] {
+        let type_id = TypeId::of::<T>();
+        if type_id != self.component_type_id() {
+            panic!("Get mutable data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
+        }
+        let data = self.data_mut_ptr() as *mut T;
+        let len = self.len();
+        // # Safety
+        // * the data has type `T`
+        // * the data has length `len`
+        unsafe {
+            std::slice::from_raw_parts_mut(data,len)
+        }
     }
 }
