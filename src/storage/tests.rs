@@ -22,7 +22,7 @@ impl Drop for Test {
 }
 
 #[test]
-fn basic_storage_dyn() {
+fn dyn_basic() {
     let sparse_set: SparseSetHashMap<EntityId, char> = SparseSet::default();
     let mut sparse_set: Box<dyn ComponentStorage> = Box::new(sparse_set);
 
@@ -56,7 +56,7 @@ fn basic_storage_dyn() {
 }
 
 #[test]
-fn rand_storage_dyn() {
+fn dyn_rand() {
     let mut rng = rand::thread_rng();
     let sparse_set: SparseSetHashMap<EntityId, String> = SparseSet::default();
     let mut sparse_set: Box<dyn ComponentStorage> = Box::new(sparse_set);
@@ -105,7 +105,7 @@ fn rand_storage_dyn() {
 }
 
 #[test]
-fn storage_dyn_drop() {
+fn dyn_drop() {
     // This test to ensure all data in storage will be released correctly
     let drop_count = Arc::new(RwLock::new(0));
 
@@ -139,7 +139,7 @@ fn storage_dyn_drop() {
 }
 
 #[test]
-fn storage_concrete_insert_drop() {
+fn concrete_insert_drop() {
     // This test to ensure all data in storage will be released correctly
     let drop_count = Arc::new(RwLock::new(0));
 
@@ -174,7 +174,7 @@ fn storage_concrete_insert_drop() {
 }
 
 #[test]
-fn storage_concrete_insert_remove_drop() {
+fn concrete_insert_remove_drop() {
     // This test to ensure all data in storage will be released correctly
     let drop_count = Arc::new(RwLock::new(0));
 
@@ -216,7 +216,7 @@ fn storage_concrete_insert_remove_drop() {
 }
 
 #[test]
-fn storage_concrete_insert_remove() {
+fn concrete_insert_remove() {
     let mut rng = rand::thread_rng();
     let sparse_set: SparseSetHashMap<EntityId, char> = SparseSet::default();
     let mut sparse_set: Box<dyn ComponentStorage> = Box::new(sparse_set);
@@ -237,5 +237,37 @@ fn storage_concrete_insert_remove() {
         let result = sparse_set.remove::<char>(id);
         assert!(result.is_some());
         assert_eq!(result.unwrap(),ch);
+    }
+}
+
+#[test]
+fn concrete_insert_batch() {
+}
+
+#[test]
+fn concrete_insert_batch_drop() {
+    // This test to ensure all data in storage will be released correctly
+    let drop_count = Arc::new(RwLock::new(0));
+
+    let sparse_set: SparseSetHashMap<EntityId, Test> = SparseSet::default();
+    let mut sparse_set: Box<dyn ComponentStorage> = Box::new(sparse_set);
+
+    let count = 100_000;
+    let start_index = 114514;
+    let start = EntityId::new(start_index).unwrap();
+    let end = EntityId::new(start_index+count).unwrap();
+
+    let range = start..end;
+    
+    let data = (0..count).map(|_|Test{count: drop_count.clone()}).collect::<Vec<_>>();
+
+    sparse_set.insert_batch(range, data);
+
+    // trig drop
+    std::mem::drop(sparse_set);
+
+    {
+        let drop_count = drop_count.read();
+        assert_eq!(count, *drop_count)
     }
 }

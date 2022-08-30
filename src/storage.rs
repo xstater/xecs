@@ -229,6 +229,30 @@ impl dyn ComponentStorage {
         result
     }
 
+    /// Insert data batch
+    /// # Panics
+    /// * Panic if the type of `data` is not same as the type of component type in Storage
+    /// * Panic if `entity_ids.count() != data.len()`
+    pub fn insert_batch<T: Component>(&mut self, entity_ids: Range<EntityId>, data: Vec<T>) {
+        let type_id = TypeId::of::<T>();
+        if type_id != self.component_type_id() {
+            panic!("Insert batch data to storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>());
+        }
+        let length = entity_ids.end.get() - entity_ids.start.get();
+        if data.len() != length {
+            panic!("Insert batch data to storage failed. The count of id is '{}' but the `data.len()` is {}. They are not equal",length,data.len());
+        }
+        let mut data = data;
+        let ptr = &mut data as *mut Vec<T> as *mut u8;
+        // # Safety
+        // * `data` is `Vec<T>`
+        // * `data` has type `T`, we checked before
+        // * `data.len() == entity_ids.count()`, we checked before
+        // * call forget after this call
+        unsafe { self.insert_any_batch_unchecked(entity_ids,ptr) }
+        std::mem::forget(data)
+    }
+
     /// Remove the data in storage by given `entity_id`
     /// # Returns
     /// * return `Some(data)` when success, return `None` if not
