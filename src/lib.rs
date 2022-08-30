@@ -30,6 +30,6 @@ where T: Send + Sync + 'static {}
 
 
 /// A combined trait with `Component` and `Any`
-pub trait ComponentAny: Component + Any{}
+pub trait ComponentAny: Component + Any{ }
 impl<T> ComponentAny for T
-where T: ComponentAny + Any {}
+where T: Component + Any {}
