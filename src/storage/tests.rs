@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
+    sync::Arc, result,
 };
 
 use crate::{ComponentAny, ComponentStorage, EntityId};
@@ -287,5 +287,42 @@ fn concrete_insert_batch_drop() {
     {
         let drop_count = drop_count.read();
         assert_eq!(count, *drop_count)
+    }
+}
+
+#[test]
+fn concrete_get_and_get_mut() {
+    let mut rng = rand::thread_rng();
+    let sparse_set: SparseSetHashMap<EntityId, char> = SparseSet::default();
+    let mut sparse_set: Box<dyn ComponentStorage> = Box::new(sparse_set);
+
+    let count = 100_000;
+
+    let mut values = Vec::new();
+
+    for id in 1..count {
+        let id = EntityId::new(id).unwrap();
+        let ch = rng.gen_range('a'..='z');
+
+        sparse_set.insert(id, ch);
+
+        if rng.gen_bool(0.6) {
+            let result = sparse_set.get_mut::<char>(id); 
+            assert!(result.is_some());
+            let result = result.unwrap();
+            *result = rng.gen_range('a'..='z');
+        } 
+
+        let result = sparse_set.get::<char>(id);
+        assert!(result.is_some());
+        let result = result.unwrap();
+        values.push((id,result.clone()));
+    }
+
+    for (id,ch) in values {
+        let result = sparse_set.get::<char>(id);
+        assert!(result.is_some());
+        let result = result.copied().unwrap();
+        assert_eq!(result,ch);
     }
 }

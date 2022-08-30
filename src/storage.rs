@@ -312,4 +312,34 @@ impl dyn ComponentStorage {
             std::slice::from_raw_parts_mut(data,len)
         }
     }
+
+    /// Get the data by given `entity_id`
+    /// # Panics
+    /// * Panic if the type of `data` is not same as the type of component type in Storage
+    pub fn get<T: Component>(&self,entity_id: EntityId) -> Option<&T> {
+        let type_id = TypeId::of::<T>();
+        if type_id != self.component_type_id() {
+            panic!("Get data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
+        }
+        self.get_ptr(entity_id)
+            .map(|ptr|ptr as *const T)
+            // # Safety
+            // * `ptr` has type `T`, we checked before
+            .map(|ptr| unsafe { &*ptr })
+    }
+
+    /// Get the mutable data by given `entity_id`
+    /// # Panics
+    /// * Panic if the type of `data` is not same as the type of component type in Storage
+    pub fn get_mut<T: Component>(&mut self,entity_id: EntityId) -> Option<&mut T> {
+        let type_id = TypeId::of::<T>();
+        if type_id != self.component_type_id() {
+            panic!("Get data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
+        }
+        self.get_mut_ptr(entity_id)
+            .map(|ptr|ptr as *mut T)
+            // # Safety
+            // * `ptr` has type `T`, we checked before
+            .map(|ptr| unsafe { &mut *ptr })
+    }
 }
