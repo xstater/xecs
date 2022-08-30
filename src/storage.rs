@@ -68,11 +68,11 @@ pub trait ComponentStorage: Send + Sync {
     /// Get all data
     /// # Returns
     /// * return a pointer to data
-    fn data(&self) -> *const u8;
+    fn data_ptr(&self) -> *const u8;
     /// Get all mutable data
     /// # Returns
     /// * return a pointer to data
-    fn data_mut(&mut self) -> *mut u8;
+    fn data_mut_ptr(&mut self) -> *mut u8;
     /// Get a slice of `EntityId`
     fn ids(&self) -> &[EntityId];
 }
@@ -169,11 +169,11 @@ where
         self.get_mut(entity_id).map(|data| data as *mut T as *mut _)
     }
 
-    fn data(&self) -> *const u8 {
+    fn data_ptr(&self) -> *const u8 {
         self.data().as_ptr() as *mut _
     }
 
-    fn data_mut(&mut self) -> *mut u8 {
+    fn data_mut_ptr(&mut self) -> *mut u8 {
         self.data_mut().as_mut_ptr() as *mut _
     }
 
