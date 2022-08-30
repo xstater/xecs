@@ -2,16 +2,13 @@ mod guards;
 #[cfg(test)]
 mod tests;
 
-pub use guards::{
-    StorageRead,
-    StorageWrite
-};
+use crate::{Component, ComponentAny, EntityId};
+pub use guards::{StorageRead, StorageWrite};
 use std::{
     any::{type_name, TypeId},
-    ops:: Range,
+    ops::Range,
 };
 use xsparseset::{SparseSet, SparseStorage};
-use crate::{Component, ComponentAny, EntityId};
 
 /// A trait to make sparse set dynamic
 pub trait ComponentStorage: Send + Sync {
@@ -23,6 +20,8 @@ pub trait ComponentStorage: Send + Sync {
     fn get_id(&self, index: usize) -> Option<EntityId>;
     /// Remove entity by ```entity_id```
     fn remove(&mut self, entity_id: EntityId);
+    /// Remove entity without dropping it
+    fn remove_and_forget(&mut self, entity_id: EntityId);
     /// Swap two items by their indices
     fn swap_by_index(&mut self, index_a: usize, index_b: usize);
     /// Get how many item in storage
@@ -60,6 +59,12 @@ where
 
     fn remove(&mut self, entity_id: EntityId) {
         SparseSet::remove(self, entity_id);
+    }
+
+    fn remove_and_forget(&mut self, entity_id: EntityId) {
+        if let Some(data) = SparseSet::remove(self, entity_id) {
+            std::mem::forget(data)
+        }
     }
 
     fn swap_by_index(&mut self, index_a: usize, index_b: usize) {
@@ -124,6 +129,6 @@ pub trait ComponentStorageConcrete: ComponentStorage {
     fn data_mut(&mut self) -> &mut [Self::Component];
     fn ids(&self) -> &[EntityId];
     fn insert(&mut self, entity_id: EntityId, data: Self::Component);
-    fn insert_batch(&mut self,entity_ids: Range<EntityId>, data: Vec<Self::Component>);
+    fn insert_batch(&mut self, entity_ids: Range<EntityId>, data: Vec<Self::Component>);
     fn remove(&mut self, entity_id: EntityId) -> Option<Self::Component>;
 }
