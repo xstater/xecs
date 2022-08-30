@@ -1,11 +1,13 @@
 mod guards;
+#[cfg(test)]
+mod tests;
 
 pub use guards::{
     StorageRead,
     StorageWrite
 };
 use std::{
-    any::{type_name, Any, TypeId},
+    any::{type_name, TypeId},
     ops:: Range,
 };
 use xsparseset::{SparseSet, SparseStorage};
@@ -74,7 +76,7 @@ where
 
     fn insert_any(&mut self, entity_id: EntityId, data: Box<dyn ComponentAny>) {
         let type_id = TypeId::of::<T>();
-        if data.type_id() != type_id {
+        if (&*data).type_id() != type_id {
             panic!(
                 "insert_any() failed, because downcast to {} failed",
                 type_name::<T>()
@@ -113,7 +115,7 @@ impl dyn 'static + ComponentStorage {
     }
 }
 
-pub trait ComponentStorageStatic: ComponentStorage {
+pub trait ComponentStorageConcrete: ComponentStorage {
     type Component: Component;
 
     fn get(&self, entity_id: EntityId) -> &Self::Component;
