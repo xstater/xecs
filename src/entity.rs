@@ -49,4 +49,9 @@ impl<'a> Entity<'a> {
     pub fn into_id(self) -> EntityId {
         self.id
     }
+
+    /// Drop this entity manually
+    pub fn manually_drop(self) {
+        todo!()
+    }
 }
