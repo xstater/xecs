@@ -1,5 +1,4 @@
 mod guards;
-mod manager;
 #[cfg(test)]
 mod tests;
 
