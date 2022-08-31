@@ -38,7 +38,7 @@ impl<'a> Entity<'a> {
     pub fn detach<T: Component>(self) -> Self {
         let type_id = TypeId::of::<T>();
         if let Some(mut storage) = self.world.storage_write(StorageId::Rust(type_id)) {
-            let _ = storage.remove_ignored(self.id);
+            storage.remove_ignored(self.id);
         } else {
             panic!("Detach component from entity 'id={}' failed. The type of Component '{}' is not registered in world",self.id,type_name::<T>());
         }
