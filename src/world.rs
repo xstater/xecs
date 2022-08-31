@@ -83,18 +83,27 @@ impl World {
         Some(StorageWrite::from_gurad(lock))
     }
 
+    /// Get the `Entity` by given `entity_id`
+    pub fn entity(&self, entity_id: EntityId) -> Option<Entity<'_>> {
+        let manager = self.entities.read();
+        if manager.has(entity_id) {
+            Some(Entity {
+                world: self,
+                id: entity_id,
+                _manager: manager,
+            })
+        } else {
+            None
+        }
+    }
+
     /// Create an empty entity and return a `Entity` which can
     /// manuiplate the entity conveniently
     pub fn create_entity(&self) -> Entity<'_> {
         let mut manager = self.entities.write();
         let id = manager.allocate();
         std::mem::drop(manager);
-        let manager = self.entities.read();
-        Entity {
-            world: self,
-            id,
-            _manager: manager,
-        }
+        self.entity(id).unwrap_or_else(|| unreachable!())
     }
 }
 
