@@ -26,11 +26,6 @@ impl World {
         }
     }
 
-    /// Get a `StoageId` from rust type
-    pub fn get_rust_storage_id<T: Component>() -> StorageId {
-        StorageId::Rust(TypeId::of::<T>())
-    }
-
     /// Allocate a `StorageId` for storing the foreign data
     pub fn allocate_other_storage_id(&mut self) -> StorageId {
         let id = self.next_other_storage_id;
@@ -59,7 +54,7 @@ impl World {
     /// # Panics
     /// * Panic if the `storage_id` is already registered
     pub fn register<T: Component>(&mut self) -> StorageId {
-        let storage_id = Self::get_rust_storage_id::<T>();
+        let storage_id = StorageId::from_rust_type::<T>();
         let storage: SparseSet<EntityId, T, HashMap<EntityId, NonZeroUsize>> = SparseSet::default();
         self.register_with_storage(storage_id, storage);
         storage_id
@@ -90,8 +85,16 @@ impl World {
 
     /// Create an empty entity and return a `Entity` which can
     /// manuiplate the entity conveniently
-    pub fn create_entity<T: Component>(&self) -> Entity<'_> {
-        todo!()
+    pub fn create_entity(&self) -> Entity<'_> {
+        let mut manager = self.entities.write();
+        let id = manager.allocate();
+        std::mem::drop(manager);
+        let manager = self.entities.read();
+        Entity {
+            world: self,
+            id,
+            _manager: manager,
+        }
     }
 }
 
@@ -99,7 +102,7 @@ impl World {
 mod tests {
     use xsparseset::SparseSet;
 
-    use crate::{EntityId, World};
+    use crate::{EntityId, StorageId, World};
 
     #[test]
     fn register_test() {
@@ -107,7 +110,7 @@ mod tests {
 
         let id_i32 = world.register::<i32>();
         assert!(world.has_registered(id_i32));
-        let id_char = World::get_rust_storage_id::<char>();
+        let id_char = StorageId::from_rust_type::<char>();
         assert!(!world.has_registered(id_char));
         let storage_char: SparseSet<EntityId, char, xsparseset::VecStorage<EntityId>> =
             SparseSet::default();
@@ -149,5 +152,4 @@ mod tests {
             char_storage.as_ref().is_empty();
         }
     }
-
 }
