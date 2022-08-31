@@ -38,5 +38,25 @@ fn basic() {
         assert!(ch1.is_none());
         let ch2 = storage.get::<()>(id2).copied();
         assert!(ch2.is_some());
+        assert_eq!(ch2.unwrap(),());
+    }
+
+    {
+        let e1 = world.entity(id1);
+        assert!(e1.is_some());
+        let e1 = e1.unwrap();
+        e1.detach::<char>();
+    }
+
+    {
+        let storage = world.storage_read(StorageId::from_rust_type::<char>());
+        assert!(storage.is_some());
+        let storage = storage.unwrap();
+        assert_eq!(storage.len(),1);
+        let ch1 = storage.get::<char>(id1).copied();
+        assert!(ch1.is_none());
+        let ch2 = storage.get::<char>(id2).copied();
+        assert!(ch2.is_some());
+        assert_eq!(ch2.unwrap(),'b');
     }
 }
