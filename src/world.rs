@@ -11,7 +11,7 @@ use crate::{
 
 /// The core of XECS
 pub struct World {
-    next_other_storage_id: u32,
+    next_other_storage_id: u64,
     storages: HashMap<StorageId, RwLock<Box<dyn ComponentStorage>>>,
     entities: RwLock<EntityManager>,
 }

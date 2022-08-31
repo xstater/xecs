@@ -21,9 +21,11 @@ pub type EntityId = NonZeroUsize;
 pub enum StorageId {
     /// Rust type
     Rust(TypeId),
+    /// Group id
+    Group(u64),
     /// Other Type   
     /// Used for FFI type
-    Other(u32),
+    Other(u64),
 }
 
 impl StorageId {
