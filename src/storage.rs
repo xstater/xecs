@@ -6,7 +6,7 @@ use crate::{Component, ComponentAny, EntityId};
 pub use guards::{StorageRead, StorageWrite};
 use std::{
     any::{type_name, TypeId},
-    ops::Range, mem::size_of,
+    ops::Range,
 };
 use xsparseset::{SparseSet, SparseStorage};
 
