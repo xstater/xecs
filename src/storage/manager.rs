@@ -12,14 +12,14 @@ enum Node {
 
 pub struct Manager {
     next_group_id: u64,
-    dag_groups: Dag<StorageId,Node,bool>
+    dag_storages: Dag<StorageId,Node,bool>
 }
 
 impl Manager {
     pub fn new() -> Self {
         Manager {
             next_group_id: 1,
-            dag_groups: Dag::new()
+            dag_storages: Dag::new()
         }
     }
 
@@ -34,6 +34,15 @@ impl Manager {
     }
 
     pub fn contains(&self, storage_id: StorageId) -> bool {
+        self.dag_storages.contains_node(storage_id)
+    }
+
+    pub fn insert_storage(&mut self, storage_id: StorageId, storage: RwLock<Box<dyn ComponentStorage>>) {
+        self.dag_storages.insert_node(storage_id, Node::Storage(storage));
+    }
+
+    pub fn remove_storage(&mut self,storage_id: StorageId) -> Option<RwLock<Box<dyn ComponentStorage>>> {
+        
         todo!()
     }
 }
