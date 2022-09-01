@@ -2,7 +2,6 @@ mod entity;
 mod range_set;
 mod storage;
 mod world;
-mod dag;
 
 use std::{
     any::Any,
