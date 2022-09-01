@@ -21,6 +21,7 @@ debug = true
 parking_lot = "0.12"
 futures = "0.3"
 xsparseset = "0.2"
+xdag = "0.1"
 
 [dev-dependencies]
 rand = "0.8"
