@@ -18,4 +18,31 @@ impl StorageId {
     pub fn from_rust_type<T: 'static>() -> StorageId {
         StorageId::Rust(TypeId::of::<T>())
     }
+
+    /// Check it is rust type
+    pub fn is_rust_type(&self) -> bool {
+        if let StorageId::Rust(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check it is group storage
+    pub fn is_group(&self) -> bool {
+        if let StorageId::Group(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check it is other type
+    pub fn is_other_type(&self) -> bool {
+        if let StorageId::Other(_) = self {
+            true
+        } else {
+            false
+        }
+    }
 }
