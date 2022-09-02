@@ -6,8 +6,7 @@ mod world;
 use std::{any::Any, num::NonZeroUsize};
 
 pub use entity::Entity;
-pub use storage::ComponentStorage;
-pub use storage::{ComponentTypeId, StorageId};
+pub use storage::{ComponentStorage, ComponentTypeId};
 pub use world::World;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

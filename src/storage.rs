@@ -1,12 +1,10 @@
 mod guards;
 mod id;
-mod manager;
 #[cfg(test)]
 mod tests;
 
 pub use guards::{StorageRead, StorageWrite};
-pub use id::{ComponentTypeId, StorageId};
-pub use manager::StorageManager;
+pub use id::ComponentTypeId;
 
 use crate::{Component, ComponentAny, EntityId};
 use std::{

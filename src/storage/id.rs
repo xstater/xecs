@@ -3,13 +3,6 @@ use std::any::TypeId;
 use crate::Component;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum StorageId{
-    Group(u32),
-    Storage(ComponentTypeId)
-}
-
-/// An ID allocated by World.  
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ComponentTypeId {
     /// Rust type
     Rust(TypeId),
