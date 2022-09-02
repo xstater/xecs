@@ -2,7 +2,7 @@ mod manager;
 #[cfg(test)]
 mod tests;
 
-use crate::{Component, EntityId, StorageId, World};
+use crate::{Component, EntityId, ComponentTypeId, World};
 pub use manager::EntityManager;
 use parking_lot::RwLockReadGuard;
 use std::any::{type_name, TypeId};
@@ -23,26 +23,14 @@ impl<'a> Entity<'a> {
     /// # Panics
     /// * Panic when `T` is not registered in `World`
     pub fn attach<T: Component>(self, component: T) -> Self {
-        let type_id = TypeId::of::<T>();
-        if let Some(mut storage) = self.world.storage_write(StorageId::Rust(type_id)) {
-            let _ = storage.insert::<T>(self.id, component);
-        } else {
-            panic!("Attach component to entity 'id={}' failed. The type of Component '{}' is not registered in world",self.id,type_name::<T>());
-        }
-        self
+        todo!()
     }
 
     /// Detach a component from entity
     /// # Panics
     /// * Panic when `T` is not registered in `World`
     pub fn detach<T: Component>(self) -> Self {
-        let type_id = TypeId::of::<T>();
-        if let Some(mut storage) = self.world.storage_write(StorageId::Rust(type_id)) {
-            storage.remove_ignored(self.id);
-        } else {
-            panic!("Detach component from entity 'id={}' failed. The type of Component '{}' is not registered in world",self.id,type_name::<T>());
-        }
-        self
+        todo!()
     }
 
     /// Consume the `Entity` and get the id in it

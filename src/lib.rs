@@ -3,15 +3,20 @@ mod range_set;
 mod storage;
 mod world;
 
-use std::{
-    any::Any,
-    num::NonZeroUsize,
-};
+use std::{any::Any, num::NonZeroUsize};
 
 pub use entity::Entity;
 pub use storage::ComponentStorage;
+pub use storage::{ComponentTypeId, StorageId};
 pub use world::World;
-pub use storage::StorageId;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(u32)]
+pub enum GroupType {
+    Full,
+    Partial,
+    Non
+}
 
 /// An id represent an entity, it's just a `NonZeroUsize`
 pub type EntityId = NonZeroUsize;

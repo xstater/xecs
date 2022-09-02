@@ -1,11 +1,12 @@
 mod guards;
-mod manager;
 mod id;
+mod manager;
 #[cfg(test)]
 mod tests;
 
 pub use guards::{StorageRead, StorageWrite};
-pub use id::StorageId;
+pub use id::{ComponentTypeId, StorageId};
+pub use manager::StorageManager;
 
 use crate::{Component, ComponentAny, EntityId};
 use std::{
@@ -16,21 +17,21 @@ use xsparseset::{SparseSet, SparseStorage};
 
 /// A trait to make sparse set dynamic
 pub trait ComponentStorage: Send + Sync {
-    /// Get the `TypeId` of components in storage
-    fn component_type_id(&self) -> TypeId;
+    /// Get the real type of components stored in storage
+    fn real_component_type_id(&self) -> TypeId;
     /// Check if storage has ```entity_id```
     fn contains(&self, entity_id: EntityId) -> bool;
     /// Get the raw index from ```entity_id``` in storage
     fn get_index(&self, entity_id: EntityId) -> Option<usize>;
     /// Get the Id from ```index``` in storage
     fn get_id(&self, index: usize) -> Option<EntityId>;
-    /// Remove entity by ```entity_id``` and ignored the removed data
-    fn remove_ignored(&mut self, entity_id: EntityId);
+    /// Remove entity by ```entity_id``` and drop the removed data
+    fn remove_and_drop(&mut self, entity_id: EntityId);
     /// Remove entity without dropping it
-    fn remove_ignored_and_forget(&mut self, entity_id: EntityId);
+    fn remove_and_forget(&mut self, entity_id: EntityId);
     /// Swap two items by their indices
     fn swap_by_index(&mut self, index_a: usize, index_b: usize);
-    /// Swap two items by their indices
+    /// Swap two items by their ids
     fn swap_by_id(&mut self, id_a: EntityId, id_b: EntityId);
     /// Get how many item in storage
     fn len(&self) -> usize;
@@ -88,7 +89,7 @@ where
     T: Component,
     S: SparseStorage<EntityId = EntityId> + Send + Sync,
 {
-    fn component_type_id(&self) -> TypeId {
+    fn real_component_type_id(&self) -> TypeId {
         TypeId::of::<T>()
     }
 
@@ -104,11 +105,11 @@ where
         SparseSet::get_id(self, index)
     }
 
-    fn remove_ignored(&mut self, entity_id: EntityId) {
+    fn remove_and_drop(&mut self, entity_id: EntityId) {
         SparseSet::remove(self, entity_id);
     }
 
-    fn remove_ignored_and_forget(&mut self, entity_id: EntityId) {
+    fn remove_and_forget(&mut self, entity_id: EntityId) {
         if let Some(data) = SparseSet::remove(self, entity_id) {
             std::mem::forget(data)
         }
@@ -216,7 +217,7 @@ impl dyn ComponentStorage {
     /// * Panic if the type of `data` is not same as the type of component type in Storage
     pub fn insert<T: Component>(&mut self, entity_id: EntityId, data: T) -> Option<T> {
         let type_id = TypeId::of::<T>();
-        if type_id != self.component_type_id() {
+        if type_id != self.real_component_type_id() {
             panic!("Insert data to storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
         }
         let result = if let Some(ptr) = self.get_mut_ptr(entity_id) {
@@ -245,7 +246,7 @@ impl dyn ComponentStorage {
     /// * Panic if `entity_ids.count() != data.len()`
     pub fn insert_batch<T: Component>(&mut self, entity_ids: Range<EntityId>, data: Vec<T>) {
         let type_id = TypeId::of::<T>();
-        if type_id != self.component_type_id() {
+        if type_id != self.real_component_type_id() {
             panic!("Insert batch data to storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>());
         }
         let length = entity_ids.end.get() - entity_ids.start.get();
@@ -259,7 +260,7 @@ impl dyn ComponentStorage {
         // * `data` has type `T`, we checked before
         // * `data.len() == entity_ids.count()`, we checked before
         // * call forget after this call
-        unsafe { self.insert_any_batch_unchecked(entity_ids,ptr) }
+        unsafe { self.insert_any_batch_unchecked(entity_ids, ptr) }
         std::mem::forget(data)
     }
 
@@ -270,7 +271,7 @@ impl dyn ComponentStorage {
     /// * Panic if the type of `data` is not same as the type of component type in Storage
     pub fn remove<T: Component>(&mut self, entity_id: EntityId) -> Option<T> {
         let type_id = TypeId::of::<T>();
-        if type_id != self.component_type_id() {
+        if type_id != self.real_component_type_id() {
             panic!("Remove data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
         }
         let result = if let Some(ptr) = self.get_mut_ptr(entity_id) {
@@ -283,7 +284,7 @@ impl dyn ComponentStorage {
         };
         // we take the ownership before
         // just forget it
-        self.remove_ignored_and_forget(entity_id);
+        self.remove_and_forget(entity_id);
         result
     }
 
@@ -292,7 +293,7 @@ impl dyn ComponentStorage {
     /// * Panic if the type of `data` is not same as the type of component type in Storage
     pub fn data<T: Component>(&self) -> &[T] {
         let type_id = TypeId::of::<T>();
-        if type_id != self.component_type_id() {
+        if type_id != self.real_component_type_id() {
             panic!("Get data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
         }
         let data = self.data_ptr() as *const T;
@@ -300,9 +301,7 @@ impl dyn ComponentStorage {
         // # Safety
         // * the data has type `T`
         // * the data has length `len`
-        unsafe {
-            std::slice::from_raw_parts(data,len)
-        }
+        unsafe { std::slice::from_raw_parts(data, len) }
     }
 
     /// Get the all mutable data in storage
@@ -310,7 +309,7 @@ impl dyn ComponentStorage {
     /// * Panic if the type of `data` is not same as the type of component type in Storage
     pub fn data_mut<T: Component>(&mut self) -> &mut [T] {
         let type_id = TypeId::of::<T>();
-        if type_id != self.component_type_id() {
+        if type_id != self.real_component_type_id() {
             panic!("Get mutable data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
         }
         let data = self.data_mut_ptr() as *mut T;
@@ -318,21 +317,19 @@ impl dyn ComponentStorage {
         // # Safety
         // * the data has type `T`
         // * the data has length `len`
-        unsafe {
-            std::slice::from_raw_parts_mut(data,len)
-        }
+        unsafe { std::slice::from_raw_parts_mut(data, len) }
     }
 
     /// Get the data by given `entity_id`
     /// # Panics
     /// * Panic if the type of `data` is not same as the type of component type in Storage
-    pub fn get<T: Component>(&self,entity_id: EntityId) -> Option<&T> {
+    pub fn get<T: Component>(&self, entity_id: EntityId) -> Option<&T> {
         let type_id = TypeId::of::<T>();
-        if type_id != self.component_type_id() {
+        if type_id != self.real_component_type_id() {
             panic!("Get data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
         }
         self.get_ptr(entity_id)
-            .map(|ptr|ptr as *const T)
+            .map(|ptr| ptr as *const T)
             // # Safety
             // * `ptr` has type `T`, we checked before
             .map(|ptr| unsafe { &*ptr })
@@ -341,13 +338,13 @@ impl dyn ComponentStorage {
     /// Get the mutable data by given `entity_id`
     /// # Panics
     /// * Panic if the type of `data` is not same as the type of component type in Storage
-    pub fn get_mut<T: Component>(&mut self,entity_id: EntityId) -> Option<&mut T> {
+    pub fn get_mut<T: Component>(&mut self, entity_id: EntityId) -> Option<&mut T> {
         let type_id = TypeId::of::<T>();
-        if type_id != self.component_type_id() {
+        if type_id != self.real_component_type_id() {
             panic!("Get data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
         }
         self.get_mut_ptr(entity_id)
-            .map(|ptr|ptr as *mut T)
+            .map(|ptr| ptr as *mut T)
             // # Safety
             // * `ptr` has type `T`, we checked before
             .map(|ptr| unsafe { &mut *ptr })

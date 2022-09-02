@@ -1,4 +1,4 @@
-use crate::{World, StorageId};
+use crate::{World, ComponentTypeId};
 
 
 #[test]
@@ -17,7 +17,7 @@ fn basic() {
         .into_id();
 
     {
-        let storage = world.storage_read(StorageId::from_rust_type::<char>());
+        let storage = world.storage_read(ComponentTypeId::from_rust_type::<char>());
         assert!(storage.is_some());
         let storage = storage.unwrap();
         assert_eq!(storage.len(),2);
@@ -30,7 +30,7 @@ fn basic() {
     }
 
     {
-        let storage = world.storage_read(StorageId::from_rust_type::<()>());
+        let storage = world.storage_read(ComponentTypeId::from_rust_type::<()>());
         assert!(storage.is_some());
         let storage = storage.unwrap();
         assert_eq!(storage.len(),1);
@@ -49,7 +49,7 @@ fn basic() {
     }
 
     {
-        let storage = world.storage_read(StorageId::from_rust_type::<char>());
+        let storage = world.storage_read(ComponentTypeId::from_rust_type::<char>());
         assert!(storage.is_some());
         let storage = storage.unwrap();
         assert_eq!(storage.len(),1);

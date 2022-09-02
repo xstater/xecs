@@ -1,25 +1,34 @@
-use std::collections::HashMap;
+use std::{hint::unreachable_unchecked, collections::HashSet};
 
 use parking_lot::RwLock;
 use xdag::Dag;
+use xsparseset::SparseSetHashMap;
 
-use crate::{ComponentStorage, StorageId};
+use crate::{ComponentStorage, EntityId, ComponentTypeId, StorageId};
+
+enum Group {
+    Full(usize),
+    Partial(usize),
+    Non(SparseSetHashMap<EntityId, (usize, usize)>),
+}
 
 enum Node {
-    Group,
-    Storage(RwLock<Box<dyn ComponentStorage>>)
+    /// Left, Right, Group
+    Group(StorageId,StorageId, RwLock<Group>),
+    /// Storage
+    Storage(RwLock<Box<dyn ComponentStorage>>),
 }
 
-pub struct Manager {
-    next_group_id: u64,
-    dag_storages: Dag<StorageId,Node,bool>
+pub struct StorageManager {
+    next_group_id: u32,
+    dag_storages: Dag<StorageId, Node, bool>,
 }
 
-impl Manager {
+impl StorageManager {
     pub fn new() -> Self {
-        Manager {
-            next_group_id: 1,
-            dag_storages: Dag::new()
+        StorageManager {
+            next_group_id: 0,
+            dag_storages: Dag::new(),
         }
     }
 
@@ -29,7 +38,7 @@ impl Manager {
         StorageId::Group(id)
     }
 
-    fn is_owned(&self,storage_id: StorageId) -> bool{
+    fn is_owned(&self, storage_id: StorageId) -> bool {
         todo!()
     }
 
@@ -37,12 +46,31 @@ impl Manager {
         self.dag_storages.contains_node(storage_id)
     }
 
-    pub fn insert_storage(&mut self, storage_id: StorageId, storage: RwLock<Box<dyn ComponentStorage>>) {
-        self.dag_storages.insert_node(storage_id, Node::Storage(storage));
+    /// Insert a component storage
+    /// # Remarks
+    /// * Replace the old one if storage_id is already in Manager
+    pub fn insert_component_storage(
+        &mut self,
+        storage_id: StorageId,
+        storage: RwLock<Box<dyn ComponentStorage>>,
+    ) {
+        self.dag_storages
+            .insert_node(storage_id, Node::Storage(storage));
     }
 
-    pub fn remove_storage(&mut self,storage_id: StorageId) -> Option<RwLock<Box<dyn ComponentStorage>>> {
-        
+    /// make a full owning group
+    /// # Safety
+    /// * `storage_id_1` and `storage_id_2` cannot be owned
+    pub unsafe fn make_full_owning(&mut self,storage_id_1: StorageId, storage_id_2: StorageId) -> StorageId {
+        let id = self.next_group_id();
+        self.dag_storages.insert_node(id,Node::Group(storage_id_1, storage_id_2,RwLock::new(Group::Full(0))));
+        self.dag_storages.insert_edge(id, storage_id_1, true).unwrap_or_else(|_|unreachable!());
+        self.dag_storages.insert_edge(id, storage_id_2, true).unwrap_or_else(|_|unreachable!());
+        id
+    }
+
+    /// This function call `ComponentStorage::insert_any_unchecked`
+    pub unsafe fn insert_component_unchecked(&self, storage_id: StorageId, entity_id: EntityId, data:*mut u8) {
         todo!()
     }
 }
