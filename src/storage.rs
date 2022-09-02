@@ -30,6 +30,8 @@ pub trait ComponentStorage: Send + Sync {
     fn remove_ignored_and_forget(&mut self, entity_id: EntityId);
     /// Swap two items by their indices
     fn swap_by_index(&mut self, index_a: usize, index_b: usize);
+    /// Swap two items by their indices
+    fn swap_by_id(&mut self, id_a: EntityId, id_b: EntityId);
     /// Get how many item in storage
     fn len(&self) -> usize;
     /// Check if storage is empty
@@ -114,6 +116,10 @@ where
 
     fn swap_by_index(&mut self, index_a: usize, index_b: usize) {
         SparseSet::swap_by_index(self, index_a, index_b)
+    }
+
+    fn swap_by_id(&mut self, id_a: EntityId, id_b: EntityId) {
+        SparseSet::swap_by_entity_id(self, id_a, id_b)
     }
 
     fn len(&self) -> usize {
