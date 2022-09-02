@@ -48,6 +48,7 @@ pub trait ComponentStorage: Send + Sync {
     unsafe fn insert_any_unchecked(&mut self, entity_id: EntityId, data: *mut u8);
     /// Insert data without any check and don't call drop if replaced
     /// # Safety
+    /// * `data` must be valid
     /// * `data` must have the same type of the storage
     /// * Don't use `data` after this call, Because the ownership of `data` was moved
     unsafe fn insert_any_unchecked_and_forget(&mut self, entity_id: EntityId, data: *mut u8);
@@ -55,6 +56,7 @@ pub trait ComponentStorage: Send + Sync {
     /// # Details
     /// * `data` is a pointer to `Vec<T>`
     /// # Safety
+    /// * `data` must be valid
     /// * `data` must have real type `Vec<T>`
     /// * `T` must have the same type of the stroage
     /// * Don't use `data` after this call, Because the ownership of `data` was moved
