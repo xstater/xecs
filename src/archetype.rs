@@ -1,5 +1,8 @@
-use std::{any::TypeId, collections::HashMap};
+mod iter;
+#[cfg(test)]
+mod tests;
 
+use std::{any::TypeId, collections::HashMap};
 use crate::{dyn_type_vec::DynTypeVec, Component, ComponentTypeId, EntityId};
 
 pub struct Archetype {
@@ -46,6 +49,11 @@ impl Archetype {
     /// 获得Archetype中所有entity的id
     pub fn ids(&self) -> &[EntityId] {
         &self.entities
+    }
+
+    /// 判断Archetype是否为空
+    pub fn is_empty(&self) -> bool {
+        self.entities.is_empty()
     }
 
     /// 检查Archetype有没有指定的entity
