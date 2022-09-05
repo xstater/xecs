@@ -10,14 +10,7 @@ use std::{any::Any, num::NonZeroUsize};
 pub use entity::Entity;
 pub use storage::{ComponentStorage, ComponentTypeId};
 pub use world::World;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(u32)]
-pub enum GroupType {
-    Full,
-    Partial,
-    Non
-}
+pub use archetype::Archetype;
 
 /// An id represent an entity, it's just a `NonZeroUsize`
 pub type EntityId = NonZeroUsize;
