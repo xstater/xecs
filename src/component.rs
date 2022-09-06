@@ -1,6 +1,13 @@
-use std::any::TypeId;
+use std::any::{TypeId, Any};
 
-use crate::Component;
+
+/// Component in XECS is just anything that implements `Send + Sync`
+pub trait Component: Send + Sync + 'static {}
+impl<T> Component for T where T: Send + Sync + 'static {}
+
+/// A combined trait with `Component` and `Any`
+pub trait ComponentAny: Component + Any {}
+impl<T> ComponentAny for T where T: Component + Any {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ComponentTypeId {
