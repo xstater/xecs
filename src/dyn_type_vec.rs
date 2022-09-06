@@ -1,5 +1,5 @@
 use crate::{Component};
-use std::any::TypeId;
+use std::{any::TypeId, ops::Range};
 
 /// 一个可以把Vec变成动态类型的Trait
 pub trait DynTypeVec {
@@ -34,14 +34,9 @@ pub trait DynTypeVec {
     /// * 调用这个函数之后不能使用data,因为所有权发生了转移
     unsafe fn push_any_unchecked(&mut self, data: *mut u8);
     /// 加一堆元素到数组最后
-    /// # Details
-    /// * 这个data指针类型应该是`Vec<T>`,因为内部是调用`Vec::append`实现的
     /// # Safety
-    /// * data必须指向有效值
-    /// * data必须是Vec<T>的指针
     /// * data的指向的数组实际类型必须和当前数组类型一致
-    /// * 调用这个函数之后不能使用data,因为所有权发生了转移
-    unsafe fn push_any_batch_unchecked(&mut self, data: *mut u8);
+    unsafe fn append_any_unchecked(&mut self, data: &mut dyn DynTypeVec);
     //// 替换数组中之前的值
     /// # Details
     /// * 之前的值会被`drop`
@@ -68,6 +63,13 @@ pub trait DynTypeVec {
     /// * 如果`self为`空，则什么也不会做
     /// * 弹出的元素会被`forget`
     fn pop_and_forget(&mut self);
+    
+    /// 从给定位置将DynTypeVec分成两段
+    /// # Returns
+    /// 本身会变成`[..index]`，返回`[index..]`
+    /// # Safety
+    /// * index不能越界
+    unsafe fn split_unchecked(&mut self, index: usize) -> Box<dyn DynTypeVec>;
     /// 获得单个元素的指针
     fn get_ptr(&self, index: usize) -> Option<*const u8>;
     /// 获得单个元素的指针
@@ -114,6 +116,16 @@ pub trait DynTypeVec {
     fn last_mut_ptr(&mut self) -> Option<*mut u8> {
         self.get_mut_ptr(self.len() - 1)
     }
+
+    /// 移除一段元素
+    /// # Safety
+    /// * range必须在范围内
+    unsafe fn remove_range(&mut self, range: Range<usize>) -> Box<dyn DynTypeVec> {
+        let mut removed_part = self.split_unchecked(range.start);
+        let mut remain_part = removed_part.split_unchecked(range.end - range.start);
+        self.append_any_unchecked(&mut *remain_part);
+        removed_part
+    }
 }
 
 impl<T> DynTypeVec for Vec<T>
@@ -151,10 +163,9 @@ where
         Vec::push(self, data)
     }
 
-    unsafe fn push_any_batch_unchecked(&mut self, data: *mut u8) {
-        let data = data as *mut Vec<T>;
-        let mut data = std::ptr::read(data);
-        Vec::append(self,&mut data)
+    unsafe fn append_any_unchecked(&mut self, data: &mut dyn DynTypeVec) {
+        let data = data.downcast_mut::<Vec<T>>();
+        Vec::append(self,data)
     }
 
     unsafe fn replace_any_and_drop_unchecked(&mut self,index: usize,data: *mut u8) {
@@ -177,6 +188,11 @@ where
 
     fn pop_and_forget(&mut self) {
         self.pop().map(|x|std::mem::forget(x));
+    }
+
+    unsafe fn split_unchecked(&mut self, index: usize) -> Box<dyn DynTypeVec> {
+        let remain = self.split_off(index);
+        Box::new(remain)
     }
 
     fn get_ptr(&self, index: usize) -> Option<*const u8> {
@@ -213,18 +229,25 @@ where
     }
 }
 
-impl dyn 'static + DynTypeVec {
-    /// Downcast `&dyn ComponentStorage` to `&T`
+impl<'a> dyn 'a + DynTypeVec {
+    /// 转换到实际类型
     /// # Safety
-    /// * Safe when `self` has type `T`
-    pub unsafe fn downcast_ref<T: DynTypeVec>(&self) -> &T {
+    /// * `Self`必须具有实际类型`T`
+    pub unsafe fn downcast_ref<T: DynTypeVec>(&'a self) -> &'a T {
         &*(self as *const dyn DynTypeVec as *const T)
     }
 
-    /// Downcast `&mut dyn ComponentStorage` to `&mut T`
+    /// 转换到实际类型
     /// # Safety
-    /// * Safe when `self` has type `T`
-    pub unsafe fn downcast_mut<T: DynTypeVec>(&mut self) -> &mut T {
+    /// * `Self`必须具有实际类型`T`
+    pub unsafe fn downcast_mut<T: DynTypeVec>(&'a mut self) -> &'a mut T {
         &mut *(self as *mut dyn DynTypeVec as *mut T)
+    }
+}
+
+impl dyn 'static + DynTypeVec {
+    pub unsafe fn downcast<T: Component>(self: Box<Self>) -> Box<T> {
+        let ptr = Box::<(dyn DynTypeVec + 'static)>::into_raw(self);
+        Box::from_raw(ptr as *mut T)
     }
 }
