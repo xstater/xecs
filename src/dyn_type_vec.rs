@@ -102,12 +102,15 @@ pub trait DynTypeVec {
     fn first_ptr(&self) -> Option<*const u8> {
         self.get_ptr(0)
     }
+    /// 获得第一个元素
     fn first_mut_ptr(&mut self) -> Option<*mut u8> {
         self.get_mut_ptr(0)
     }
+    /// 获得最后一个元素
     fn last_ptr(&self) -> Option<*const u8> {
          self.get_ptr(self.len() - 1)
     }
+    /// 获得最后一个元素
     fn last_mut_ptr(&mut self) -> Option<*mut u8> {
         self.get_mut_ptr(self.len() - 1)
     }
