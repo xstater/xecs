@@ -131,7 +131,7 @@ where
     }
 
     fn swap(&mut self, index_a: usize, index_b: usize) {
-        Vec::swap(self, index_a, index_b)
+        self.as_mut_slice().swap(index_a, index_b)
     }
 
     fn len(&self) -> usize {
