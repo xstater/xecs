@@ -68,6 +68,11 @@ impl Archetype {
         self.entities.contains(&entity_id)
     }
 
+    /// 检查Archetype中是否包含储存`component_id`指定类型的storage
+    pub fn contains_storage(&self, component_id: ComponentTypeId) -> bool {
+        self.types.contains(&component_id)
+    }
+
     /// 获得entity在Archetype中的index
     pub fn get_index(&self, entity_id: EntityId) -> Option<usize> {
         self.sparse.get(&entity_id).copied()
