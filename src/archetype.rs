@@ -5,6 +5,7 @@ mod tests;
 use std::{any::TypeId, collections::HashMap};
 use crate::{dyn_type_vec::DynTypeVec, Component, ComponentTypeId, EntityId};
 
+/// 具有相同Component组合类型的entity的容器
 pub struct Archetype {
     types: Vec<ComponentTypeId>,
     raw_types: Vec<TypeId>,
@@ -29,6 +30,11 @@ impl Archetype {
         self.types.push(component_id);
         self.raw_types.push(TypeId::of::<T>());
         self.storages.push(Box::new(Vec::<T>::new()));
+    }
+
+    pub(crate) fn create_rust_storage<T: Component>(&mut self) {
+        let cid = ComponentTypeId::from_rust_type::<T>();
+        self.create_storage::<T>(cid);
     }
 
     /// 获得Archetype中元素个数
@@ -59,6 +65,19 @@ impl Archetype {
     /// 检查Archetype有没有指定的entity
     pub fn contains(&self, entity_id: EntityId) -> bool {
         self.entities.contains(&entity_id)
+    }
+
+    /// 获得entity在Archetype中的index
+    pub fn get_index(&self,entity_id: EntityId) -> Option<usize> {
+        self.sparse.get(&entity_id).copied()
+    }
+
+    pub fn storages_ref(&self) -> &[Box<dyn DynTypeVec>] {
+        &self.storages
+    }
+
+    pub fn storages_mut(&mut self) -> &mut [Box<dyn DynTypeVec>] {
+        &mut self.storages
     }
 
     /// 插入buffer中的数据到Archetype中
@@ -197,32 +216,4 @@ impl Archetype {
             *data_ptrs.get_unchecked_mut(i) = ptr;
         }
     }
-}
-
-trait FromPtrSlice {
-    unsafe fn from_ptr_slice(ptrs: &[*const u8]) -> Self;
-}
-
-impl FromPtrSlice for () {
-    unsafe fn from_ptr_slice(_: &[*const u8]) -> Self {
-        ()
-    }
-}
-
-impl<A> FromPtrSlice for (A,) {
-    unsafe fn from_ptr_slice(ptrs: &[*const u8]) -> Self {
-        let a = std::ptr::read::<A>((*ptrs.get_unchecked(0)) as *mut _);
-        (a,)
-    }
-}
-
-impl<A,B> FromPtrSlice for (A,B) {
-    unsafe fn from_ptr_slice(ptrs: &[*const u8]) -> Self {
-        let a = std::ptr::read::<A>((*ptrs.get_unchecked(0)) as *mut _);
-        let b = std::ptr::read::<B>((*ptrs.get_unchecked(1)) as *mut _);
-        (a,b)
-    }
-}
-
-impl Archetype {
 }
