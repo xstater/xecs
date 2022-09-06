@@ -1,5 +1,5 @@
 use parking_lot::RwLock;
-use crate::{entity::EntityManager, Archetype};
+use crate::{entity::EntityManager, Archetype, ComponentTypeId};
 
 
 /// XECS的核心
@@ -17,6 +17,13 @@ impl World {
             entities: RwLock::new(EntityManager::new()),
             archetypes: Vec::new()
         }
+    }
+
+    /// 为外部类型分配一个id
+    pub fn allocate_other_component_id(&mut self) -> ComponentTypeId {
+        let id = self.next_other_storage_id;
+        self.next_other_storage_id += 1;
+        ComponentTypeId::Other(id)
     }
 
 }
