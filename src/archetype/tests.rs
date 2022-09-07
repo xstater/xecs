@@ -52,7 +52,7 @@ fn basic_test() {
         assert!(archetype.contains(id));
         // get data
         let mut buffer = [null(), null()];
-        archetype.get_unchecked(id, buffer.as_mut_slice());
+        archetype.get_ptr_unchecked(id, buffer.as_mut_slice());
 
         let a = buffer[0] as *const i32;
         let b = buffer[1] as *mut char;
@@ -107,7 +107,7 @@ fn rand_insert() {
 
         for (id, (data1, data2)) in ids {
             unsafe {
-                archetype.get_unchecked(id, buffer.as_mut_slice());
+                archetype.get_ptr_unchecked(id, buffer.as_mut_slice());
                 let int = &*(buffer[0] as *const i32);
                 let chr = &*(buffer[1] as *const char);
 
@@ -244,7 +244,7 @@ fn rand_insert_and_remove_and_drop() {
     let mut buffer = [null(), null(), null()];
     for id in need_removed {
         unsafe {
-            archetype.get_unchecked(id, &mut buffer);
+            archetype.get_ptr_unchecked(id, &mut buffer);
 
             let data1 = &*(buffer[0] as *const i32);
             let data2 = &*(buffer[1] as *const char);
@@ -324,7 +324,7 @@ fn rand_insert_and_remove_bacth_and_drop() {
             let chr = *chr;
 
             unsafe {
-                archetype.get_unchecked(id, &mut buffer);
+                archetype.get_ptr_unchecked(id, &mut buffer);
 
                 let data1 = &*(buffer[0] as *const i32);
                 let data2 = &*(buffer[1] as *const char);
