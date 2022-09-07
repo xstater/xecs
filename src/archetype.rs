@@ -32,22 +32,28 @@ impl Archetype {
         }
     }
 
+    /// 添加一个storage到archetype中
+    pub(in crate) fn add_storage(&mut self,component_id: ComponentTypeId, storage: Box<dyn DynTypeVec>) {
+        self.types.push(component_id);
+        self.raw_types.push(storage.type_id());
+        self.storages.push(storage);
+    }
+
     /// 在Archetype中创建一个storage
     /// # Details
     /// * `T`是实际的储存类型
     /// * `component_id`是id，可以用来储存外部类型
     /// # Remarks
     /// 该方法可由xecs自动调用。一般只有在FFI时需要使用
-    pub fn create_storage<T: Component>(&mut self, component_id: ComponentTypeId) {
-        self.types.push(component_id);
-        self.raw_types.push(TypeId::of::<T>());
-        self.storages.push(Box::new(Vec::<T>::new()));
+    pub(in crate) fn create_storage<T: Component>(&mut self, component_id: ComponentTypeId) {
+        let storage = Vec::<T>::new();
+        self.add_storage(component_id, Box::new(storage));
     }
 
     /// 创建一个用于Rust类型的storage
     /// # Remarks
     /// 该方法可由xecs自动调用。一般只有在FFI时需要使用
-    pub fn create_rust_storage<T: Component>(&mut self) {
+    pub(in crate) fn create_rust_storage<T: Component>(&mut self) {
         let cid = ComponentTypeId::from_rust_type::<T>();
         self.create_storage::<T>(cid);
     }

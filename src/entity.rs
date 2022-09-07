@@ -33,6 +33,10 @@ impl<'a> Entity<'a> {
         todo!()
     }
 
+    pub fn id(&self) -> EntityId {
+        self.id
+    }
+
     /// Consume the `Entity` and get the id in it
     pub fn into_id(self) -> EntityId {
         self.id
