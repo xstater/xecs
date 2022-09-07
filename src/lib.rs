@@ -4,7 +4,6 @@ mod world;
 mod archetype;
 mod dyn_type_vec;
 mod component;
-mod tuple;
 
 use std::num::NonZeroUsize;
 
