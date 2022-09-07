@@ -1,12 +1,14 @@
 mod iter;
-mod concrete;
+mod guard;
 #[cfg(test)]
 mod tests;
 
 use crate::{dyn_type_vec::DynTypeVec, Component, ComponentTypeId, EntityId};
-use std::{any::TypeId, collections::HashMap, ops::Range};
+use std::{any::TypeId, collections::HashMap, ops::Range, hash::Hash};
 
 /// 具有相同Component组合类型的entity的容器
+/// # Remarks
+/// * 两个Archetype相等，当且仅当其`types()`含有完全相同的值（不考虑顺序）
 pub struct Archetype {
     types: Vec<ComponentTypeId>,
     raw_types: Vec<TypeId>,
@@ -17,7 +19,10 @@ pub struct Archetype {
 }
 
 impl Archetype {
-    pub(crate) fn new() -> Self {
+    /// 创建一个空的Archetype
+    /// # Remakrs
+    /// 该方法可由xecs自动调用。一般只有在FFI时需要使用
+    pub fn new() -> Self {
         Archetype {
             types: Vec::new(),
             raw_types: Vec::new(),
@@ -27,13 +32,22 @@ impl Archetype {
         }
     }
 
-    pub(crate) fn create_storage<T: Component>(&mut self, component_id: ComponentTypeId) {
+    /// 在Archetype中创建一个storage
+    /// # Details
+    /// * `T`是实际的储存类型
+    /// * `component_id`是id，可以用来储存外部类型
+    /// # Remarks
+    /// 该方法可由xecs自动调用。一般只有在FFI时需要使用
+    pub fn create_storage<T: Component>(&mut self, component_id: ComponentTypeId) {
         self.types.push(component_id);
         self.raw_types.push(TypeId::of::<T>());
         self.storages.push(Box::new(Vec::<T>::new()));
     }
 
-    pub(crate) fn create_rust_storage<T: Component>(&mut self) {
+    /// 创建一个用于Rust类型的storage
+    /// # Remarks
+    /// 该方法可由xecs自动调用。一般只有在FFI时需要使用
+    pub fn create_rust_storage<T: Component>(&mut self) {
         let cid = ComponentTypeId::from_rust_type::<T>();
         self.create_storage::<T>(cid);
     }
@@ -73,18 +87,28 @@ impl Archetype {
         self.types.contains(&component_id)
     }
 
+    /// 检查Archetype中是否包含储存`component_ids`中所有的storage
+    pub fn contains_storages(&self, component_ids: &[ComponentTypeId]) -> bool {
+        for id in component_ids {
+            if !self.contains_storage(*id) {
+                return false;
+            }
+        }
+        true
+    }
+
     /// 获得entity在Archetype中的index
     pub fn get_index(&self, entity_id: EntityId) -> Option<usize> {
         self.sparse.get(&entity_id).copied()
     }
 
     /// 获得所有的storages
-    pub fn storages_ref(&self) -> &[Box<dyn DynTypeVec>] {
+    pub fn all_storages_ref(&self) -> &[Box<dyn DynTypeVec>] {
         &self.storages
     }
 
     /// 获得所有的storages
-    pub fn storages_mut(&mut self) -> &mut [Box<dyn DynTypeVec>] {
+    pub fn all_storages_mut(&mut self) -> &mut [Box<dyn DynTypeVec>] {
         &mut self.storages
     }
 
@@ -275,7 +299,7 @@ impl Archetype {
     /// # Safety
     /// * `entity_id`必须存在于Archetype中
     /// * `data_ptrs.len() == self.types().len()`
-    pub unsafe fn get_unchecked(&self, entity_id: EntityId, data_ptrs: &mut [*const u8]) {
+    pub unsafe fn get_ptr_unchecked(&self, entity_id: EntityId, data_ptrs: &mut [*const u8]) {
         let index = self.sparse.get(&entity_id).copied().unwrap_unchecked();
         for i in 0..self.storages.len() {
             let storage = self.storages.get_unchecked(i);
@@ -290,7 +314,7 @@ impl Archetype {
     /// # Safety
     /// * `entity_id`必须存在于Archetype中
     /// * `data_ptrs.len() == self.types().len()`
-    pub unsafe fn get_mut_unchecked(&mut self, entity_id: EntityId, data_ptrs: &mut [*mut u8]) {
+    pub unsafe fn get_mut_ptr_unchecked(&mut self, entity_id: EntityId, data_ptrs: &mut [*mut u8]) {
         let index = self.sparse.get(&entity_id).copied().unwrap_unchecked();
         for i in 0..self.storages.len() {
             let storage = self.storages.get_unchecked_mut(i);
@@ -299,4 +323,23 @@ impl Archetype {
         }
     }
 
+}
+
+impl PartialEq for Archetype {
+    fn eq(&self, other: &Self) -> bool {
+        for ty in &self.types {
+            if !other.contains_storage(*ty) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl Eq for Archetype { }
+
+impl Hash for Archetype {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.types.hash(state);
+    }
 }
