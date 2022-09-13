@@ -5,7 +5,7 @@ use xsparseset::{SparseSet, SparseSetHashMap};
 
 use crate::{
     entity::EntityManager,
-    storage::{ComponentStorage, StorageRead, StorageWrite, StorageManager},
+    storage::{ComponentStorage, StorageRead, StorageWrite},
     Component, ComponentTypeId, Entity, EntityId, StorageId, GroupType,
 };
 

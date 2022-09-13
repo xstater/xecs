@@ -6,7 +6,6 @@ mod world;
 use std::{any::Any, num::NonZeroUsize};
 
 pub use entity::Entity;
-pub use storage::ComponentStorage;
 pub use storage::{ComponentTypeId, StorageId};
 pub use world::World;
 
