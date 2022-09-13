@@ -20,8 +20,10 @@ pub trait ComponentStorage: Storage {
     fn remove_and_drop(&mut self, entity_id: EntityId);
     /// Remove entity without dropping it
     fn remove_and_forget(&mut self, entity_id: EntityId);
-    /// Swap two items by their indices
-    fn swap_by_index(&mut self, index_a: usize, index_b: usize);
+    /// Swap two items by their indices without any check
+    /// # Safety
+    /// * `index_a` and `index_b` must be in range
+    unsafe fn swap_by_index_unchecked(&mut self, index_a: usize, index_b: usize);
     /// Swap two items by their ids
     fn swap_by_id(&mut self, id_a: EntityId, id_b: EntityId);
     /// Insert data which implements `Any` (rust type) in compoenent storage
@@ -130,8 +132,8 @@ where
         }
     }
 
-    fn swap_by_index(&mut self, index_a: usize, index_b: usize) {
-        SparseSet::swap_by_index(self, index_a, index_b)
+    unsafe fn swap_by_index_unchecked(&mut self, index_a: usize, index_b: usize) {
+        SparseSet::swap_by_index_unchecked(self, index_a, index_b)
     }
 
     fn swap_by_id(&mut self, id_a: EntityId, id_b: EntityId) {

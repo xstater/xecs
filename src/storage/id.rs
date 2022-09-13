@@ -3,7 +3,7 @@ use std::any::TypeId;
 use crate::Component;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum StorageId{
+pub enum InnerStorageId{
     Group(u32),
     Storage(ComponentTypeId)
 }
@@ -55,6 +55,27 @@ impl TryInto<TypeId> for ComponentTypeId {
         match self {
             ComponentTypeId::Rust(rust_type) => Ok(rust_type),
             ComponentTypeId::Other(_) => Err(()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct StorageId(InnerStorageId);
+
+impl StorageId {
+    /// Check a stroage is component stroage
+    pub fn is_component_storage(&self) -> bool{
+        match &self.0 {
+            InnerStorageId::Group(_) => false,
+            InnerStorageId::Storage(_) => true,
+        }
+    }
+
+    /// Check a stroage is group stroage
+    pub fn is_group_storage(&self) -> bool{
+        match &self.0 {
+            InnerStorageId::Group(_) => true,
+            InnerStorageId::Storage(_) => false,
         }
     }
 }
