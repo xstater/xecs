@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
-use crate::ComponentStorage;
+use super::ComponentStorage;
 
 
 /// A Read lock gurad for Component Storage

@@ -1,352 +1,262 @@
+mod component;
+mod group;
 mod guards;
 mod id;
 #[cfg(test)]
 mod tests;
 
+use std::collections::HashMap;
+
+pub use component::ComponentStorage;
+pub use group::{FullOwningGroup, GroupStorage};
 pub use guards::{StorageRead, StorageWrite};
-pub use id::ComponentTypeId;
+pub use id::{ComponentTypeId, StorageId};
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use xdag::Dag;
 
-use crate::{Component, ComponentAny, EntityId};
-use std::{
-    any::{type_name, TypeId},
-    ops::Range,
-};
-use xsparseset::{SparseSet, SparseStorage};
+use crate::EntityId;
 
-/// A trait to make sparse set dynamic
-pub trait ComponentStorage: Send + Sync {
-    /// Get the real type of components stored in storage
-    fn real_component_type_id(&self) -> TypeId;
-    /// Check if storage has ```entity_id```
-    fn contains(&self, entity_id: EntityId) -> bool;
-    /// Get the raw index from ```entity_id``` in storage
-    fn get_index(&self, entity_id: EntityId) -> Option<usize>;
-    /// Get the Id from ```index``` in storage
-    fn get_id(&self, index: usize) -> Option<EntityId>;
-    /// Remove entity by ```entity_id``` and drop the removed data
-    fn remove_and_drop(&mut self, entity_id: EntityId);
-    /// Remove entity without dropping it
-    fn remove_and_forget(&mut self, entity_id: EntityId);
-    /// Swap two items by their indices
-    fn swap_by_index(&mut self, index_a: usize, index_b: usize);
-    /// Swap two items by their ids
-    fn swap_by_id(&mut self, id_a: EntityId, id_b: EntityId);
+pub trait Storage: Send + Sync {
     /// Get how many item in storage
     fn len(&self) -> usize;
     /// Check if storage is empty
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
-    /// Insert data which implements `Any` (rust type) in compoenent storage
-    /// # Panics
-    /// * This function should panic when downcast data to the type of storage failed
-    fn insert_any(&mut self, entity_id: EntityId, data: Box<dyn ComponentAny>);
-    /// Insert data without any check, can be used in pass a value on stack or FFI type
+    /// downcast to component storage
+    fn as_component_storage_ref(&self) -> Option<&dyn ComponentStorage>;
+    /// downcast to componentstorage
+    fn as_component_storage_mut(&mut self) -> Option<&mut dyn ComponentStorage>;
+    /// downcast to group storage
+    fn as_group_storage_ref(&self) -> Option<&dyn GroupStorage>;
+    /// downcast to component
+    fn as_group_storage_mut(&mut self) -> Option<&mut dyn GroupStorage>;
+}
+
+pub(crate) struct Storages {
+    pub(crate) storages: Dag<StorageId, RwLock<Box<dyn Storage>>, bool>,
+}
+
+impl Storages {
+    /// Add a storage to storages
     /// # Safety
-    /// * `data` must have the same type of the storage
-    /// * Don't use `data` after this call, Because the ownership of `data` was moved
-    unsafe fn insert_any_unchecked(&mut self, entity_id: EntityId, data: *mut u8);
-    /// Insert data without any check and don't call drop if replaced
+    /// * `storage_id.is_component_storage() == true`
+    /// * `storage` must implemented `ComponentStorage`
+    /// * `self.storages.contains_node(storage_id) == false`
+    pub(crate) unsafe fn add_component_storage_unchecked(
+        &mut self,
+        storage_id: StorageId,
+        storage: Box<dyn Storage>,
+    ) {
+        self.storages.insert_node(storage_id, RwLock::new(storage));
+    }
+    /// Add a group to storages
     /// # Safety
-    /// * `data` must be valid
-    /// * `data` must have the same type of the storage
-    /// * Don't use `data` after this call, Because the ownership of `data` was moved
-    unsafe fn insert_any_unchecked_and_forget(&mut self, entity_id: EntityId, data: *mut u8);
-    /// Insert data batch without any check
+    /// * `group_id.is_group_storage() == true`
+    /// * `self.storages.contains_node(group_id) == false`
+    /// * `self.storages.contains_node(storage_id1) == true`
+    /// * `self.storages.contains_node(storage_id2) == true`
+    /// * `storage` must implemented `GroupStorage` and ha
+    /// * `self.is_owned(storage_id1) == false`
+    /// * `self.is_owned(storage_id2) == false`
+    pub(crate) unsafe fn add_full_owning_group_unchecked(
+        &mut self,
+        group_id: StorageId,
+        group: Box<dyn Storage>,
+        storage_id1: StorageId,
+        storage_id2: StorageId,
+    ) {
+        self.storages.insert_node(group_id, RwLock::new(group));
+        self.storages
+            .insert_edge(group_id, storage_id1, true)
+            .unwrap_unchecked();
+        self.storages
+            .insert_edge(group_id, storage_id2, true)
+            .unwrap_unchecked();
+    }
+
+    /// Check a storage is owned by any other storage
+    /// # Safety
+    /// * `storage_id` must exist in `Storages`
+    pub(crate) unsafe fn is_owned(&self, storage_id: StorageId) -> bool {
+        for parent in self.storages.parents(storage_id) {
+            let edge = self
+                .storages
+                .get_edge(parent, storage_id)
+                // # Safety
+                // * `storage_id` must exist in `Storage`
+                .unwrap_unchecked()
+                // # Safety
+                // * Must have this edge because the `from` of `get_edge` is the parents of `storage`
+                .unwrap_unchecked();
+            if *edge {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check an entity exists in storage
     /// # Details
-    /// * `data` is a pointer to `Vec<T>`
+    /// * storage can be a group
+    /// * when storage is a group ,return `Some(index)` only if entity exists in all its children
+    /// * if a storage is not locked (lock guard cannot be found in `read_locks` or write_locks`),
+    ///   this function will read lock it and add guard to `read_locks`
     /// # Safety
-    /// * `data` must be valid
-    /// * `data` must have real type `Vec<T>`
-    /// * `T` must have the same type of the stroage
-    /// * Don't use `data` after this call, Because the ownership of `data` was moved
-    /// * `Vec<T>::len() == entity_ids.count()`
-    unsafe fn insert_any_batch_unchecked(&mut self, entity_ids: Range<EntityId>, data: *mut u8);
-    /// Get the pointer of data by given `entity_id`
-    /// # Returns
-    /// * Return `Some(v)` if storage contains the `entity_id`, return `None` if not
-    /// * `v` is a pointer to data
-    fn get_ptr(&self, entity_id: EntityId) -> Option<*const u8>;
-    /// Get the mutable pointer of data by given `entity_id`
-    /// # Returns
-    /// * Return `Some(v)` if storage contains the `entity_id`, return `None` if not
-    /// * `v` is a pointer to data
-    fn get_mut_ptr(&mut self, entity_id: EntityId) -> Option<*mut u8>;
-    /// Get all data
-    /// # Returns
-    /// * return a pointer to data
-    fn data_ptr(&self) -> *const u8;
-    /// Get all mutable data
-    /// # Returns
-    /// * return a pointer to data
-    fn data_mut_ptr(&mut self) -> *mut u8;
-    /// Get a slice of `EntityId`
-    fn ids(&self) -> &[EntityId];
-}
-
-impl<T, S> ComponentStorage for SparseSet<EntityId, T, S>
-where
-    T: Component,
-    S: SparseStorage<EntityId = EntityId> + Send + Sync,
-{
-    fn real_component_type_id(&self) -> TypeId {
-        TypeId::of::<T>()
-    }
-
-    fn contains(&self, entity_id: EntityId) -> bool {
-        SparseSet::contains(self, entity_id)
-    }
-
-    fn get_index(&self, entity_id: EntityId) -> Option<usize> {
-        SparseSet::get_index(self, entity_id)
-    }
-
-    fn get_id(&self, index: usize) -> Option<EntityId> {
-        SparseSet::get_id(self, index)
-    }
-
-    fn remove_and_drop(&mut self, entity_id: EntityId) {
-        SparseSet::remove(self, entity_id);
-    }
-
-    fn remove_and_forget(&mut self, entity_id: EntityId) {
-        if let Some(data) = SparseSet::remove(self, entity_id) {
-            std::mem::forget(data)
-        }
-    }
-
-    fn swap_by_index(&mut self, index_a: usize, index_b: usize) {
-        SparseSet::swap_by_index(self, index_a, index_b)
-    }
-
-    fn swap_by_id(&mut self, id_a: EntityId, id_b: EntityId) {
-        SparseSet::swap_by_entity_id(self, id_a, id_b)
-    }
-
-    fn len(&self) -> usize {
-        SparseSet::len(self)
-    }
-
-    fn is_empty(&self) -> bool {
-        SparseSet::is_empty(self)
-    }
-
-    fn insert_any(&mut self, entity_id: EntityId, data: Box<dyn ComponentAny>) {
-        let type_id = TypeId::of::<T>();
-        if (&*data).type_id() != type_id {
-            panic!(
-                "insert_any() failed, because downcast to {} failed",
-                type_name::<T>()
-            );
-        }
-        // # Safety
-        // * we checked the type before ,so the casting is safe
-        let data = unsafe {
-            let ptr = Box::into_raw(data);
-            let ptr = ptr as *mut T;
-            std::ptr::read(ptr)
-        };
-        self.insert(entity_id, data);
-    }
-
-    unsafe fn insert_any_unchecked(&mut self, entity_id: EntityId, data: *mut u8) {
-        let data = data as *mut T;
-        let data = std::ptr::read(data);
-        self.insert(entity_id, data);
-    }
-
-    unsafe fn insert_any_unchecked_and_forget(&mut self, entity_id: EntityId, data: *mut u8) {
-        let data = data as *mut T;
-        let data = std::ptr::read(data);
-        if let Some(replaced) = self.insert(entity_id, data) {
-            std::mem::forget(replaced);
-        }
-    }
-
-    unsafe fn insert_any_batch_unchecked(&mut self, entity_ids: Range<EntityId>, data: *mut u8) {
-        let data = data as *mut Vec<T>;
-        let mut data = std::ptr::read(data);
-        let mut ids = (entity_ids.start.get()..entity_ids.end.get())
-            .map(|id| EntityId::new_unchecked(id))
-            .collect::<Vec<_>>();
-        self.insert_batch(&mut ids, &mut data);
-    }
-
-    fn get_ptr(&self, entity_id: EntityId) -> Option<*const u8> {
-        self.get(entity_id).map(|data| data as *const T as *const _)
-    }
-
-    fn get_mut_ptr(&mut self, entity_id: EntityId) -> Option<*mut u8> {
-        self.get_mut(entity_id).map(|data| data as *mut T as *mut _)
-    }
-
-    fn data_ptr(&self) -> *const u8 {
-        self.data().as_ptr() as *mut _
-    }
-
-    fn data_mut_ptr(&mut self) -> *mut u8 {
-        self.data_mut().as_mut_ptr() as *mut _
-    }
-
-    fn ids(&self) -> &[EntityId] {
-        SparseSet::ids(self)
-    }
-}
-
-impl dyn 'static + ComponentStorage {
-    /// Downcast `&dyn ComponentStorage` to `&T`
-    /// # Safety
-    /// * Safe when `self` has type `T`
-    pub unsafe fn downcast_ref<T: ComponentStorage>(&self) -> &T {
-        &*(self as *const dyn ComponentStorage as *const T)
-    }
-
-    /// Downcast `&mut dyn ComponentStorage` to `&mut T`
-    /// # Safety
-    /// * Safe when `self` has type `T`
-    pub unsafe fn downcast_mut<T: ComponentStorage>(&mut self) -> &mut T {
-        &mut *(self as *mut dyn ComponentStorage as *mut T)
-    }
-}
-
-impl dyn ComponentStorage {
-    /// Insert a type `T` data into sparse_set
-    /// # Returns
-    /// * Return `Some(data)` which was replaced if success, `None` if not
-    /// # Panics
-    /// * Panic if the type of `data` is not same as the type of component type in Storage
-    pub fn insert<T: Component>(&mut self, entity_id: EntityId, data: T) -> Option<T> {
-        let type_id = TypeId::of::<T>();
-        if type_id != self.real_component_type_id() {
-            panic!("Insert data to storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
-        }
-        let result = if let Some(ptr) = self.get_mut_ptr(entity_id) {
-            let ptr = ptr as *mut T;
-            // # Safety
-            // * ptr has the real type `T`, we checked before
-            Some(unsafe { std::ptr::read(ptr) })
+    /// * `self.storages.contains_node(storage_id) == true`
+    pub(crate) unsafe fn contains_entity(
+        &self,
+        storage_id: StorageId,
+        entity_id: EntityId,
+        read_locks: &mut HashMap<StorageId, RwLockReadGuard<'_, Box<dyn Storage>>>,
+        write_locks: &HashMap<StorageId, RwLockWriteGuard<'_, Box<dyn Storage>>>,
+    ) -> bool {
+        let storage = if let Some(read) = read_locks.get(&storage_id) {
+            read.as_ref()
+        } else if let Some(write) = write_locks.get(&storage_id) {
+            write.as_ref()
         } else {
-            None
+            let read = self.storages.get_node(storage_id).unwrap_unchecked().read();
+            read_locks.insert(storage_id, read);
+            read_locks.get(&storage_id).unwrap_unchecked().as_ref()
         };
-        let mut data = data;
-        let ptr = &mut data as *mut T as *mut _;
-        // # Safety
-        // * ptr has the real type `T`, we checked before
-        // * call `forget(data)` after this calling
-        unsafe {
-            self.insert_any_unchecked_and_forget(entity_id, ptr);
-        }
-        std::mem::forget(data);
-        result
-    }
 
-    /// Insert data batch
-    /// # Panics
-    /// * Panic if the type of `data` is not same as the type of component type in Storage
-    /// * Panic if `entity_ids.count() != data.len()`
-    pub fn insert_batch<T: Component>(&mut self, entity_ids: Range<EntityId>, data: Vec<T>) {
-        let type_id = TypeId::of::<T>();
-        if type_id != self.real_component_type_id() {
-            panic!("Insert batch data to storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>());
-        }
-        let length = entity_ids.end.get() - entity_ids.start.get();
-        if data.len() != length {
-            panic!("Insert batch data to storage failed. The count of id is '{}' but the `data.len()` is {}. They are not equal",length,data.len());
-        }
-        let mut data = data;
-        let ptr = &mut data as *mut Vec<T> as *mut u8;
-        // # Safety
-        // * `data` is `Vec<T>`
-        // * `data` has type `T`, we checked before
-        // * `data.len() == entity_ids.count()`, we checked before
-        // * call forget after this call
-        unsafe { self.insert_any_batch_unchecked(entity_ids, ptr) }
-        std::mem::forget(data)
-    }
-
-    /// Remove the data in storage by given `entity_id`
-    /// # Returns
-    /// * return `Some(data)` when success, return `None` if not
-    /// # Panics
-    /// * Panic if the type of `data` is not same as the type of component type in Storage
-    pub fn remove<T: Component>(&mut self, entity_id: EntityId) -> Option<T> {
-        let type_id = TypeId::of::<T>();
-        if type_id != self.real_component_type_id() {
-            panic!("Remove data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
-        }
-        let result = if let Some(ptr) = self.get_mut_ptr(entity_id) {
-            let ptr = ptr as *mut T;
-            // # Safety
-            // * ptr has the real type `T`, we checked before
-            Some(unsafe { std::ptr::read(ptr) })
+        if storage_id.is_component_storage() {
+            let storage = storage.as_component_storage_ref().unwrap_unchecked();
+            storage.contains(entity_id)
         } else {
-            None
+            let mut children_iter = self.storages.children(storage_id);
+            let (child_id1, _) = children_iter.next().unwrap_unchecked();
+            let (child_id2, _) = children_iter.next().unwrap_unchecked();
+            let result_1 = self.contains_entity(child_id1, entity_id, read_locks, write_locks);
+            let result_2 = self.contains_entity(child_id2, entity_id, read_locks, write_locks);
+
+            result_1 && result_2
+        }
+    }
+
+    /// Get the index of entity in storage
+    /// # Details
+    /// * storage can be a group
+    /// * when storage is a group ,return `Some(index)` only if all indices of children storages are `Some(index)` and equal
+    /// * if a storage is not locked (lock guard cannot be found in `read_locks` or write_locks`),
+    ///   this function will read lock it and add guard to `read_locks`
+    /// # Safety
+    /// * `self.storages.contains_node(storage_id) == true`
+    pub(crate) unsafe fn get_index(
+        &self,
+        storage_id: StorageId,
+        entity_id: EntityId,
+        read_locks: &mut HashMap<StorageId, RwLockReadGuard<'_, Box<dyn Storage>>>,
+        write_locks: &HashMap<StorageId, RwLockWriteGuard<'_, Box<dyn Storage>>>,
+    ) -> Option<usize> {
+        let storage = if let Some(read) = read_locks.get(&storage_id) {
+            read.as_ref()
+        } else if let Some(write) = write_locks.get(&storage_id) {
+            write.as_ref()
+        } else {
+            let read = self.storages.get_node(storage_id).unwrap_unchecked().read();
+            read_locks.insert(storage_id, read);
+            read_locks.get(&storage_id).unwrap_unchecked().as_ref()
         };
-        // we take the ownership before
-        // just forget it
-        self.remove_and_forget(entity_id);
-        result
+
+        if storage_id.is_component_storage() {
+            let storage = storage.as_component_storage_ref().unwrap_unchecked();
+            storage.get_index(entity_id)
+        } else {
+            let mut children_iter = self.storages.children(storage_id);
+            let (child_id1, _) = children_iter.next().unwrap_unchecked();
+            let (child_id2, _) = children_iter.next().unwrap_unchecked();
+            let index_1 = self.get_index(child_id1, entity_id, read_locks, write_locks)?;
+            let index_2 = self.get_index(child_id2, entity_id, read_locks, write_locks)?;
+            if index_1 == index_2 {
+                Some(index_1)
+            } else {
+                None
+            }
+        }
     }
 
-    /// Get the all data in storage
-    /// # Panics
-    /// * Panic if the type of `data` is not same as the type of component type in Storage
-    pub fn data<T: Component>(&self) -> &[T] {
-        let type_id = TypeId::of::<T>();
-        if type_id != self.real_component_type_id() {
-            panic!("Get data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
+    /// Swap two entities in storage
+    /// # Details
+    /// * storage can be a group
+    /// * when storage is a group , all children storages will execute this function
+    /// # Safety
+    /// * `self.storages.contains_node(storage_id) == true`
+    /// * `index_a` and `index_b` must be in range
+    pub(crate) unsafe fn swap_entity_by_index_unchecked(
+        &self,
+        storage_id: StorageId,
+        index_a: usize,
+        index_b: usize,
+        read_locks: &mut HashMap<StorageId, RwLockReadGuard<'_, Box<dyn Storage>>>,
+        write_locks: &mut HashMap<StorageId, RwLockWriteGuard<'_, Box<dyn Storage>>>,
+    ) {
+        let storage = if let Some(write) = write_locks.get_mut(&storage_id) {
+            write.as_mut()
+        } else {
+            if read_locks.contains_key(&storage_id) {
+                read_locks.remove(&storage_id);
+            }
+            let write = self.storages.get_node(storage_id).unwrap_unchecked().write();
+            write_locks.insert(storage_id, write);
+            write_locks.get_mut(&storage_id).unwrap_unchecked().as_mut()
+        };
+
+        if storage_id.is_component_storage() {
+            let storage = storage.as_component_storage_ref().unwrap_unchecked();
+            storage.swap_by_index_unchecked(index_a, index_b);
+        } else {
+            let mut children_iter = self.storages.children(storage_id);
+            let (child_id1, is_owned1) = children_iter.next().unwrap_unchecked();
+            let (child_id2, is_owned2) = children_iter.next().unwrap_unchecked();
+            // can only swap owning storage
+            if *is_owned1 {
+                self.swap_entity_by_index_unchecked(child_id1, index_a, index_b,read_locks, write_locks);
+            }
+            if *is_owned2 {
+                self.swap_entity_by_index_unchecked(child_id2, index_a, index_b, read_locks, write_locks);
+            }
         }
-        let data = self.data_ptr() as *const T;
-        let len = self.len();
-        // # Safety
-        // * the data has type `T`
-        // * the data has length `len`
-        unsafe { std::slice::from_raw_parts(data, len) }
     }
 
-    /// Get the all mutable data in storage
-    /// # Panics
-    /// * Panic if the type of `data` is not same as the type of component type in Storage
-    pub fn data_mut<T: Component>(&mut self) -> &mut [T] {
-        let type_id = TypeId::of::<T>();
-        if type_id != self.real_component_type_id() {
-            panic!("Get mutable data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
-        }
-        let data = self.data_mut_ptr() as *mut T;
-        let len = self.len();
-        // # Safety
-        // * the data has type `T`
-        // * the data has length `len`
-        unsafe { std::slice::from_raw_parts_mut(data, len) }
-    }
+    pub(crate) unsafe fn add_entity_to_group_unchecked(
+        &self,
+        storage_id: StorageId,
+        entity_id: EntityId,
+        read_locks: &mut HashMap<StorageId, RwLockReadGuard<'_, Box<dyn Storage>>>,
+        write_locks: &mut HashMap<StorageId, RwLockWriteGuard<'_, Box<dyn Storage>>>,
+    ) {
+        let storage = if let Some(write) = write_locks.get_mut(&storage_id) {
+            write.as_mut()
+        } else {
+            let write = self.storages.get_node(storage_id).unwrap_unchecked().write();
+            write_locks.insert(storage_id, write);
+            write_locks.get_mut(&storage_id).unwrap_unchecked().as_mut()
+        };
 
-    /// Get the data by given `entity_id`
-    /// # Panics
-    /// * Panic if the type of `data` is not same as the type of component type in Storage
-    pub fn get<T: Component>(&self, entity_id: EntityId) -> Option<&T> {
-        let type_id = TypeId::of::<T>();
-        if type_id != self.real_component_type_id() {
-            panic!("Get data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
+        if storage_id.is_component_storage() {
+            return;
         }
-        self.get_ptr(entity_id)
-            .map(|ptr| ptr as *const T)
-            // # Safety
-            // * `ptr` has type `T`, we checked before
-            .map(|ptr| unsafe { &*ptr })
-    }
 
-    /// Get the mutable data by given `entity_id`
-    /// # Panics
-    /// * Panic if the type of `data` is not same as the type of component type in Storage
-    pub fn get_mut<T: Component>(&mut self, entity_id: EntityId) -> Option<&mut T> {
-        let type_id = TypeId::of::<T>();
-        if type_id != self.real_component_type_id() {
-            panic!("Get data from storage failed. The data type '{}' is not same as type of components in storage",type_name::<T>())
+        let group = storage.as_group_storage_mut().unwrap_unchecked();
+        let mut children_iter = self.storages.children(storage_id);
+        let (child_id1, is_owned1) = children_iter.next().unwrap_unchecked();
+        let (child_id2, is_owned2) = children_iter.next().unwrap_unchecked();
+        
+        self.add_entity_to_group_unchecked(child_id1, entity_id, read_locks, write_locks);
+        self.add_entity_to_group_unchecked(child_id2, entity_id, read_locks, write_locks);
+
+        if let Some(index_a) = self.get_index(child_id1, entity_id, &mut HashMap::new(), write_locks) 
+        && let Some(index_b) = self.get_index(child_id2, entity_id, &mut HashMap::new(), write_locks){
+            // need add to group
+            // this cannot be overflow 
+            // because when `len() == 0`,`get_index` will return None
+            let last_index = group.len() - 1;
+            // we can only swap the owning storage
+            if *is_owned1 {
+
+            }
         }
-        self.get_mut_ptr(entity_id)
-            .map(|ptr| ptr as *mut T)
-            // # Safety
-            // * `ptr` has type `T`, we checked before
-            .map(|ptr| unsafe { &mut *ptr })
     }
 }
