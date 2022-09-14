@@ -1,18 +1,16 @@
-use std::{any::TypeId, collections::HashMap, num::NonZeroUsize};
 
 use parking_lot::RwLock;
-use xsparseset::{SparseSet, SparseSetHashMap};
+use xsparseset::{SparseSetHashMap};
 
 use crate::{
     entity::EntityManager,
     storage::{ComponentStorage, StorageRead, StorageWrite},
-    Component, ComponentTypeId, Entity, EntityId, InnerStorageId, GroupType,
+    Component, ComponentTypeId, Entity, EntityId,GroupType, StorageId,
 };
 
 /// The core of XECS
 pub struct World {
     next_other_storage_id: u64,
-    storages: StorageManager,
     entities: RwLock<EntityManager>,
 }
 
@@ -21,7 +19,6 @@ impl World {
     pub fn new() -> Self {
         World {
             next_other_storage_id: 0,
-            storages: StorageManager::new(),
             entities: RwLock::new(EntityManager::new()),
         }
     }
@@ -29,16 +26,11 @@ impl World {
     /// Register a custom component storage with `ComponentTypeId`
     /// # Panics
     /// * Panic if `has_registered(component_id)`
-    pub fn register_with_storage<S>(&mut self, component_id: ComponentTypeId, storage: S) -> InnerStorageId
+    pub fn register_with_storage<S>(&mut self, component_id: ComponentTypeId, storage: S) -> StorageId
     where
         S: ComponentStorage + 'static,
     {
-        let storage_id = InnerStorageId::Storage(component_id);
-        if self.storages.contains(storage_id) {
-            panic!("Component storage (id = {:?}) was registered",component_id);
-        }
-        self.storages.insert_component_storage(storage_id, RwLock::new(Box::new(storage)));
-        storage_id
+        todo!()
     }
 
     /// Register a default component storage with `ComponentTypeId`
@@ -46,15 +38,15 @@ impl World {
     /// * default component storage is `xsparseset::SparseSetHashMap<EntityId,C>`
     /// # Panics
     /// * Panic if `has_registered(component_id)`
-    pub fn register<C: Component>(&mut self) -> InnerStorageId {
+    pub fn register<C: Component>(&mut self) -> StorageId {
         let component_id = ComponentTypeId::from_rust_type::<C>();
         let storage: SparseSetHashMap<EntityId,C> = SparseSetHashMap::default();
         self.register_with_storage(component_id, storage)
     }
 
     /// Check a `storage_id` is registered
-    pub fn is_registered(&self, storage_id: InnerStorageId) -> bool {
-        self.storages.contains(storage_id)
+    pub fn is_registered(&self, storage_id: StorageId) -> bool {
+        todo!()
     }
 
     /// Unregister a component
@@ -62,24 +54,24 @@ impl World {
     /// * This function can use to release memory
     /// # Returns 
     /// * Return `Some(storage)` if unregister successfull
-    pub fn unregister(&mut self, storage_id: InnerStorageId) -> Option<Box<dyn ComponentStorage>> {
+    pub fn unregister(&mut self, storage_id: StorageId) -> Option<Box<dyn ComponentStorage>> {
         todo!()
     }
 
     /// Get a storage in a read guard
-    pub fn storage_read(&self, storage_id: InnerStorageId) -> Option<StorageRead<'_>> {
+    pub fn storage_read(&self, storage_id: StorageId) -> Option<StorageRead<'_>> {
         todo!()
     }
 
     /// Get a storage in a write gurad
-    pub fn storage_write(&self, storage_id: InnerStorageId) -> Option<StorageWrite<'_>> {
+    pub fn storage_write(&self, storage_id: StorageId) -> Option<StorageWrite<'_>> {
         todo!()
     }
 
     /// Make a group to accelerate the query
     /// # Panics
     /// * Panic if `storage_id_1` or `storage_id_2` is already owned by another group
-    pub fn make_group(&mut self,group_type: GroupType, storage_id_1: InnerStorageId, storage_id_2: InnerStorageId) -> InnerStorageId {
+    pub fn make_group(&mut self,group_type: GroupType, storage_id_1: StorageId, storage_id_2: StorageId) -> StorageId {
         todo!()
     }
 

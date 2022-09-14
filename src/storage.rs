@@ -212,10 +212,10 @@ impl Storages {
             let (child_id2, is_owned2) = children_iter.next().unwrap_unchecked();
             // can only swap owning storage
             if *is_owned1 {
-                self.swap_entity_by_index_unchecked(child_id1, index_a, index_b, write_locks);
+                self.swap_entity_by_index_unchecked(child_id1, index_a, index_b,read_locks, write_locks);
             }
             if *is_owned2 {
-                self.swap_entity_by_index_unchecked(child_id2, index_a, index_b, write_locks);
+                self.swap_entity_by_index_unchecked(child_id2, index_a, index_b, read_locks, write_locks);
             }
         }
     }
@@ -244,8 +244,8 @@ impl Storages {
         let (child_id1, is_owned1) = children_iter.next().unwrap_unchecked();
         let (child_id2, is_owned2) = children_iter.next().unwrap_unchecked();
         
-        self.add_entity_to_group_unchecked(child_id1, entity_id, write_locks);
-        self.add_entity_to_group_unchecked(child_id2, entity_id, write_locks);
+        self.add_entity_to_group_unchecked(child_id1, entity_id, read_locks, write_locks);
+        self.add_entity_to_group_unchecked(child_id2, entity_id, read_locks, write_locks);
 
         if let Some(index_a) = self.get_index(child_id1, entity_id, &mut HashMap::new(), write_locks) 
         && let Some(index_b) = self.get_index(child_id2, entity_id, &mut HashMap::new(), write_locks){
