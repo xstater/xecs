@@ -2,10 +2,8 @@ mod iter;
 #[cfg(test)]
 mod tests;
 
-use std::ptr::null_mut;
-
 use crate::{
-    dyn_type_vec::DynTypeVec, entity::EntityManager, Archetype, Component, ComponentTypeId, Entity,
+    archetype::{ArchetypeRead, ArchetypeWrite}, entity::EntityManager, Archetype, Component, ComponentTypeId, Entity,
     EntityId,
 };
 use parking_lot::RwLock;
@@ -14,7 +12,9 @@ use parking_lot::RwLock;
 pub struct World {
     next_other_storage_id: u64,
     entities: RwLock<EntityManager>,
-    archetypes: RwLock<Vec<RwLock<Archetype>>>
+    archetypes_lock: RwLock<()>,
+    // 同时储存ComponentTypeId信息，可以在不加锁的情况下获得Archetype的类型信息
+    archetypes: Vec<(Vec<ComponentTypeId>, RwLock<Archetype>)>,
 }
 
 impl World {
@@ -23,7 +23,8 @@ impl World {
         World {
             next_other_storage_id: 0,
             entities: RwLock::new(EntityManager::new()),
-            archetypes: RwLock::new(Vec::new()),
+            archetypes_lock: RwLock::new(()),
+            archetypes: Vec::new(),
         }
     }
 
@@ -37,34 +38,44 @@ impl World {
     /// 判断是否有一个由`component_ids`确定的archetype
     pub fn has_archetype(&self, component_ids: &[ComponentTypeId]) -> bool {
         self.archetypes
-            .read()
             .iter()
-            .find(|archetype| archetype.read().types() == component_ids)
+            .find(|(archetype_components,_)| archetype_components == component_ids)
             .is_some()
     }
 
-    /// 获得一个由`component_ids`确定的archetype
-    pub fn archetype(&self, component_ids: &[ComponentTypeId]) -> Option<&RwLock<Archetype>> {
-        self.archetypes
+    /// 获得`component_ids`指定的Archetype
+    /// # Details
+    /// * `component_ids`顺序不必一致
+    pub fn archetype(&self, component_ids: &[ComponentTypeId]) -> Option<ArchetypeRead<'_>> {
+        let lock = self.archetypes_lock.read();
+        let archetype = self.archetypes
             .iter()
-            .find(|archetype| archetype.read().types() == component_ids)
+            .find(|(archetype_components,_)| archetype_components == component_ids)
+            .map(|(_,archetype)|archetype.read())?;
+        Some(ArchetypeRead { _lock: lock, archetype })
     }
 
-    /// 找到所有能储存`component_ids`中类型的Archetype
-    /// # Remarks
-    /// * 不考虑顺序
-    pub fn find_archetypes(&self, component_ids: &[ComponentTypeId]) -> Vec<&RwLock<Archetype>> {
-        self.archetypes
+    /// 获得`component_ids`指定的Archetype
+    /// # Details
+    /// * `component_ids`顺序不必一致
+    pub fn archetype_mut(&self, component_ids: &[ComponentTypeId]) -> Option<ArchetypeWrite<'_>> {
+        let lock = self.archetypes_lock.read();
+        let archetype = self.archetypes
             .iter()
-            .filter(|archetype| archetype.read().contains_storages(component_ids))
-            .collect::<Vec<_>>()
+            .find(|(archetype_components,_)| archetype_components == component_ids)
+            .map(|(_,archetype)|archetype.write())?;
+        Some(ArchetypeWrite{ _lock: lock, archetype })
     }
 
-    /// 查找entity位于哪个archetype中
-    pub fn get_archetype_by_id(&self, entity_id: EntityId) -> Option<&RwLock<Archetype>> {
-        self.archetypes
-            .iter()
-            .find(|archetype| archetype.read().contains(entity_id))
+
+    fn push_archetype(&self, archetype: Archetype) {
+        let component_ids = archetype.types().to_owned();
+        let _lock = self.archetypes_lock.write();
+        let ptr = &self.archetypes as *const _ as *mut Vec<(Vec<ComponentTypeId>,RwLock<Archetype>)>;
+        // # Safety
+        // _lock确保了此时拥有所有权，获得&mut借用是安全的
+        let archetypes = unsafe { &mut *ptr };
+        archetypes.push((component_ids,RwLock::new(archetype)));
     }
 
     /// 创建一个entity并返回该entity的hanle以方便操作
@@ -99,8 +110,6 @@ impl World {
                 entity_id
             );
         }
-
-
 
         todo!()
     }
