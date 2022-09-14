@@ -108,31 +108,8 @@ impl Storages {
         &self,
         storage_id: StorageId,
         entity_id: EntityId,
-        read_locks: &mut HashMap<StorageId, RwLockReadGuard<'_, Box<dyn Storage>>>,
-        write_locks: &HashMap<StorageId, RwLockWriteGuard<'_, Box<dyn Storage>>>,
     ) -> bool {
-        let storage = if let Some(read) = read_locks.get(&storage_id) {
-            read.as_ref()
-        } else if let Some(write) = write_locks.get(&storage_id) {
-            write.as_ref()
-        } else {
-            let read = self.storages.get_node(storage_id).unwrap_unchecked().read();
-            read_locks.insert(storage_id, read);
-            read_locks.get(&storage_id).unwrap_unchecked().as_ref()
-        };
-
-        if storage_id.is_component_storage() {
-            let storage = storage.as_component_storage_ref().unwrap_unchecked();
-            storage.contains(entity_id)
-        } else {
-            let mut children_iter = self.storages.children(storage_id);
-            let (child_id1, _) = children_iter.next().unwrap_unchecked();
-            let (child_id2, _) = children_iter.next().unwrap_unchecked();
-            let result_1 = self.contains_entity(child_id1, entity_id, read_locks, write_locks);
-            let result_2 = self.contains_entity(child_id2, entity_id, read_locks, write_locks);
-
-            result_1 && result_2
-        }
+        todo!();
     }
 
     /// Get the index of entity in storage
@@ -147,34 +124,8 @@ impl Storages {
         &self,
         storage_id: StorageId,
         entity_id: EntityId,
-        read_locks: &mut HashMap<StorageId, RwLockReadGuard<'_, Box<dyn Storage>>>,
-        write_locks: &HashMap<StorageId, RwLockWriteGuard<'_, Box<dyn Storage>>>,
     ) -> Option<usize> {
-        let storage = if let Some(read) = read_locks.get(&storage_id) {
-            read.as_ref()
-        } else if let Some(write) = write_locks.get(&storage_id) {
-            write.as_ref()
-        } else {
-            let read = self.storages.get_node(storage_id).unwrap_unchecked().read();
-            read_locks.insert(storage_id, read);
-            read_locks.get(&storage_id).unwrap_unchecked().as_ref()
-        };
-
-        if storage_id.is_component_storage() {
-            let storage = storage.as_component_storage_ref().unwrap_unchecked();
-            storage.get_index(entity_id)
-        } else {
-            let mut children_iter = self.storages.children(storage_id);
-            let (child_id1, _) = children_iter.next().unwrap_unchecked();
-            let (child_id2, _) = children_iter.next().unwrap_unchecked();
-            let index_1 = self.get_index(child_id1, entity_id, read_locks, write_locks)?;
-            let index_2 = self.get_index(child_id2, entity_id, read_locks, write_locks)?;
-            if index_1 == index_2 {
-                Some(index_1)
-            } else {
-                None
-            }
-        }
+        todo!()
     }
 
     /// Swap two entities in storage
@@ -189,74 +140,15 @@ impl Storages {
         storage_id: StorageId,
         index_a: usize,
         index_b: usize,
-        read_locks: &mut HashMap<StorageId, RwLockReadGuard<'_, Box<dyn Storage>>>,
-        write_locks: &mut HashMap<StorageId, RwLockWriteGuard<'_, Box<dyn Storage>>>,
     ) {
-        let storage = if let Some(write) = write_locks.get_mut(&storage_id) {
-            write.as_mut()
-        } else {
-            if read_locks.contains_key(&storage_id) {
-                read_locks.remove(&storage_id);
-            }
-            let write = self.storages.get_node(storage_id).unwrap_unchecked().write();
-            write_locks.insert(storage_id, write);
-            write_locks.get_mut(&storage_id).unwrap_unchecked().as_mut()
-        };
-
-        if storage_id.is_component_storage() {
-            let storage = storage.as_component_storage_ref().unwrap_unchecked();
-            storage.swap_by_index_unchecked(index_a, index_b);
-        } else {
-            let mut children_iter = self.storages.children(storage_id);
-            let (child_id1, is_owned1) = children_iter.next().unwrap_unchecked();
-            let (child_id2, is_owned2) = children_iter.next().unwrap_unchecked();
-            // can only swap owning storage
-            if *is_owned1 {
-                self.swap_entity_by_index_unchecked(child_id1, index_a, index_b,read_locks, write_locks);
-            }
-            if *is_owned2 {
-                self.swap_entity_by_index_unchecked(child_id2, index_a, index_b, read_locks, write_locks);
-            }
-        }
+        todo!()
     }
 
     pub(crate) unsafe fn add_entity_to_group_unchecked(
         &self,
         storage_id: StorageId,
         entity_id: EntityId,
-        read_locks: &mut HashMap<StorageId, RwLockReadGuard<'_, Box<dyn Storage>>>,
-        write_locks: &mut HashMap<StorageId, RwLockWriteGuard<'_, Box<dyn Storage>>>,
     ) {
-        let storage = if let Some(write) = write_locks.get_mut(&storage_id) {
-            write.as_mut()
-        } else {
-            let write = self.storages.get_node(storage_id).unwrap_unchecked().write();
-            write_locks.insert(storage_id, write);
-            write_locks.get_mut(&storage_id).unwrap_unchecked().as_mut()
-        };
-
-        if storage_id.is_component_storage() {
-            return;
-        }
-
-        let group = storage.as_group_storage_mut().unwrap_unchecked();
-        let mut children_iter = self.storages.children(storage_id);
-        let (child_id1, is_owned1) = children_iter.next().unwrap_unchecked();
-        let (child_id2, is_owned2) = children_iter.next().unwrap_unchecked();
-        
-        self.add_entity_to_group_unchecked(child_id1, entity_id, read_locks, write_locks);
-        self.add_entity_to_group_unchecked(child_id2, entity_id, read_locks, write_locks);
-
-        if let Some(index_a) = self.get_index(child_id1, entity_id, &mut HashMap::new(), write_locks) 
-        && let Some(index_b) = self.get_index(child_id2, entity_id, &mut HashMap::new(), write_locks){
-            // need add to group
-            // this cannot be overflow 
-            // because when `len() == 0`,`get_index` will return None
-            let last_index = group.len() - 1;
-            // we can only swap the owning storage
-            if *is_owned1 {
-
-            }
-        }
+        todo!()
     }
 }
