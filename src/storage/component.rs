@@ -26,7 +26,7 @@ pub trait ComponentStorage: Storage {
     unsafe fn swap_by_index_unchecked(&mut self, index_a: usize, index_b: usize);
     /// Swap two items by their ids
     fn swap_by_id(&mut self, id_a: EntityId, id_b: EntityId);
-    /// Insert data which implements `Any` (rust type) in compoenent storage
+    /// Insert data which implements `Any` (rust type) in component storage
     /// # Panics
     /// * This function should panic when downcast data to the type of storage failed
     fn insert_any(&mut self, entity_id: EntityId, data: Box<dyn ComponentAny>);
@@ -45,7 +45,7 @@ pub trait ComponentStorage: Storage {
     /// * `data` is a pointer to `Vec<T>`
     /// # Safety
     /// * `data` must have real type `Vec<T>`
-    /// * `T` must have the same type of the stroage
+    /// * `T` must have the same type of the storage
     /// * Don't use `data` after this call, Because the ownership of `data` was moved
     /// * `Vec<T>::len() == entity_ids.count()`
     unsafe fn insert_any_batch_unchecked(&mut self, entity_ids: Range<EntityId>, data: *mut u8);
