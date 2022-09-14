@@ -2,8 +2,6 @@ mod entity;
 mod range_set;
 mod storage;
 mod world;
-mod archetype;
-mod dyn_type_vec;
 
 use std::{any::Any, num::NonZeroUsize};
 
