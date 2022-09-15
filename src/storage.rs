@@ -5,13 +5,13 @@ mod id;
 #[cfg(test)]
 mod tests;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 pub use component::ComponentStorage;
 pub use group::{FullOwningGroup, GroupStorage};
 pub use guards::{StorageRead, StorageWrite};
 pub use id::{ComponentTypeId, StorageId};
-use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use parking_lot::{RwLock, RwLockReadGuard, RwLockUpgradableReadGuard, RwLockWriteGuard};
 use xdag::Dag;
 
 use crate::EntityId;
@@ -25,7 +25,7 @@ pub trait Storage: Send + Sync {
     }
     /// downcast to component storage
     fn as_component_storage_ref(&self) -> Option<&dyn ComponentStorage>;
-    /// downcast to componentstorage
+    /// downcast to component storage
     fn as_component_storage_mut(&mut self) -> Option<&mut dyn ComponentStorage>;
     /// downcast to group storage
     fn as_group_storage_ref(&self) -> Option<&dyn GroupStorage>;
@@ -96,6 +96,92 @@ impl Storages {
         false
     }
 
+    /// Get read locks
+    /// # Details
+    /// * It sort the locks by StorageId to avoid dead-lock
+    /// # Safety
+    /// * All id in `storage_ids` must exists in `Storages`
+    unsafe fn read_locks(
+        &self,
+        storage_ids: impl Iterator<Item = StorageId>,
+    ) -> HashMap<StorageId, RwLockReadGuard<'_, Box<dyn Storage>>> {
+        let mut ids = storage_ids.collect::<Vec<_>>();
+
+        ids.sort_unstable();
+
+        let mut locks = HashMap::new();
+        for id in ids {
+            let read = self.storages.get_node(id).unwrap_unchecked().read();
+            locks.insert(id, read);
+        }
+        locks
+    }
+
+    /// Get write locks
+    /// # Details
+    /// * It sort the locks by StorageId to avoid dead-lock
+    /// # Safety
+    /// * All id in `storage_ids` must exists in `Storages`
+    unsafe fn write_locks(
+        &self,
+        storage_ids: impl Iterator<Item = StorageId>,
+    ) -> HashMap<StorageId, RwLockWriteGuard<'_, Box<dyn Storage>>> {
+        let mut ids = storage_ids.collect::<Vec<_>>();
+
+        ids.sort_unstable();
+
+        let mut locks = HashMap::new();
+        for id in ids {
+            let read = self.storages.get_node(id).unwrap_unchecked().write();
+            locks.insert(id, read);
+        }
+        locks
+    }
+
+    /// Get all roots of the storage by given `storage_id`
+    fn roots_of(&self, storage_id: StorageId) -> Vec<StorageId> {
+        let mut roots = Vec::new();
+
+        let mut queue = VecDeque::new();
+        queue.push_back(storage_id);
+
+        while let Some(current) = queue.pop_front() {
+            let mut count = 0;
+            for parent in self.storages.parents(current) {
+                queue.push_back(parent);
+                count += 1;
+            }
+            if count == 0 {
+                roots.push(current);
+            }
+        }
+
+        roots
+    }
+
+    /// Get all storages of sub graph which `storage_id` is in
+    fn sub_graph_of(&self, storage_id: StorageId) -> Vec<StorageId> {
+        let roots = self.roots_of(storage_id);
+        let mut queue = VecDeque::new();
+
+        for root in roots {
+            queue.push_back(root);
+        }
+
+        let mut ids = Vec::new();
+        while let Some(current) = queue.pop_front() {
+            if !ids.contains(&current) {
+                ids.push(current);
+
+                for (child, _) in self.storages.children(current) {
+                    queue.push_back(child)
+                }
+            }
+        }
+
+        ids
+    }
+
     /// Check an entity exists in storage
     /// # Details
     /// * storage can be a group
@@ -104,28 +190,26 @@ impl Storages {
     ///   this function will read lock it and add guard to `read_locks`
     /// # Safety
     /// * `self.storages.contains_node(storage_id) == true`
-    pub(crate) unsafe fn contains_entity(
-        &self,
+    unsafe fn contains_entity<'func, 'this>(
+        &'this self,
         storage_id: StorageId,
         entity_id: EntityId,
+        locks: &'func HashMap<StorageId, RwLockReadGuard<'this, Box<dyn Storage>>>,
     ) -> bool {
-        todo!();
-    }
-
-    /// Get the index of entity in storage
-    /// # Details
-    /// * storage can be a group
-    /// * when storage is a group ,return `Some(index)` only if all indices of children storages are `Some(index)` and equal
-    /// * if a storage is not locked (lock guard cannot be found in `read_locks` or write_locks`),
-    ///   this function will read lock it and add guard to `read_locks`
-    /// # Safety
-    /// * `self.storages.contains_node(storage_id) == true`
-    pub(crate) unsafe fn get_index(
-        &self,
-        storage_id: StorageId,
-        entity_id: EntityId,
-    ) -> Option<usize> {
-        todo!()
+        if storage_id.is_component_storage() {
+            let storage = locks.get(&storage_id).unwrap_unchecked();
+            storage
+                .as_component_storage_ref()
+                .unwrap_unchecked()
+                .contains(entity_id)
+        } else {
+            for (child, _) in self.storages.children(storage_id) {
+                if !self.contains_entity(child, entity_id, locks) {
+                    return false;
+                }
+            }
+            true
+        }
     }
 
     /// Swap two entities in storage
@@ -149,6 +233,28 @@ impl Storages {
         storage_id: StorageId,
         entity_id: EntityId,
     ) {
-        todo!()
+        let sub_graph_storages = self.sub_graph_of(storage_id);
+        let read_locks = self.read_locks(sub_graph_storages.into_iter());
+
+        let mut need_upgrade = Vec::new();
+
+        let roots = self.roots_of(storage_id);
+
+        let check_need_upgrade = |storages: &Storages, storage_id: StorageId| -> bool {
+            if storage_id.is_component_storage() {
+                let storage = read_locks.get(&storage_id).unwrap_unchecked();
+                storage
+                    .as_component_storage_ref()
+                    .unwrap_unchecked()
+                    .contains(entity_id)
+            } else {
+                for (child, _) in self.storages.children(storage_id) {
+                    if !(child, entity_id, ) {
+                        return false;
+                    }
+                }
+                true
+            }
+        }
     }
 }
