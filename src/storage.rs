@@ -96,46 +96,38 @@ impl Storages {
         false
     }
 
-    /// Get read locks
+    /// Get all locks
     /// # Details
     /// * It sort the locks by StorageId to avoid dead-lock
     /// # Safety
     /// * All id in `storage_ids` must exists in `Storages`
-    unsafe fn read_locks(
+    /// * `storage_ids` cannot has repeat id
+    unsafe fn locks(
         &self,
-        storage_ids: impl Iterator<Item = StorageId>,
-    ) -> HashMap<StorageId, RwLockReadGuard<'_, Box<dyn Storage>>> {
+        storage_ids: impl Iterator<Item = (StorageId, bool)>,
+    ) -> (HashMap<StorageId, RwLockReadGuard<'_, Box<dyn Storage>>>, HashMap<StorageId, RwLockWriteGuard<'_,Box<dyn Storage>>>){
         let mut ids = storage_ids.collect::<Vec<_>>();
 
         ids.sort_unstable();
 
-        let mut locks = HashMap::new();
-        for id in ids {
-            let read = self.storages.get_node(id).unwrap_unchecked().read();
-            locks.insert(id, read);
+        let mut read_locks = HashMap::new();
+        let mut write_locks = HashMap::new();
+
+        for (id,is_read) in ids {
+            if is_read {
+                let read = self.storages.get_node(id)
+                    .unwrap_unchecked()
+                    .read();
+                read_locks.insert(id, read);
+            } else {
+                let write = self.storages.get_node(id)
+                    .unwrap_unchecked()
+                    .write();
+                write_locks.insert(id,write);
+            }
         }
-        locks
-    }
 
-    /// Get write locks
-    /// # Details
-    /// * It sort the locks by StorageId to avoid dead-lock
-    /// # Safety
-    /// * All id in `storage_ids` must exists in `Storages`
-    unsafe fn write_locks(
-        &self,
-        storage_ids: impl Iterator<Item = StorageId>,
-    ) -> HashMap<StorageId, RwLockWriteGuard<'_, Box<dyn Storage>>> {
-        let mut ids = storage_ids.collect::<Vec<_>>();
-
-        ids.sort_unstable();
-
-        let mut locks = HashMap::new();
-        for id in ids {
-            let read = self.storages.get_node(id).unwrap_unchecked().write();
-            locks.insert(id, read);
-        }
-        locks
+        (read_locks,write_locks)
     }
 
     /// Get all roots of the storage by given `storage_id`
@@ -240,21 +232,6 @@ impl Storages {
 
         let roots = self.roots_of(storage_id);
 
-        let check_need_upgrade = |storages: &Storages, storage_id: StorageId| -> bool {
-            if storage_id.is_component_storage() {
-                let storage = read_locks.get(&storage_id).unwrap_unchecked();
-                storage
-                    .as_component_storage_ref()
-                    .unwrap_unchecked()
-                    .contains(entity_id)
-            } else {
-                for (child, _) in self.storages.children(storage_id) {
-                    if !(child, entity_id, ) {
-                        return false;
-                    }
-                }
-                true
-            }
-        }
+
     }
 }
