@@ -90,7 +90,7 @@ impl World {
     }
 
     /// Create an empty entity and return a `Entity` which can
-    /// manuiplate the entity conveniently
+    /// manipulate the entity conveniently
     pub fn create_entity(&self) -> Entity<'_> {
         let mut manager = self.entities.write();
         let id = manager.allocate();
