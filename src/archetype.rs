@@ -1,157 +1,145 @@
-mod iter;
-mod guards;
-#[cfg(test)]
-mod tests;
+use std::{collections::HashMap, any::TypeId};
 
-use crate::{dyn_type_vec::DynTypeVec, Component, ComponentTypeId, EntityId};
-use std::{any::TypeId, collections::HashMap, ops::Range, hash::Hash};
+use crate::{ComponentTypeId, EntityId, dyn_type_vec::DynTypeVec, Component};
 
-pub use guards::{
-    ArchetypeRead,
-    ArchetypeWrite
-};
-
-/// 具有相同Component组合类型的entity的容器
-/// # Remarks
-/// * 两个Archetype相等，当且仅当其`types()`含有完全相同的值（不考虑顺序）
-pub struct Archetype {
-    types: Vec<ComponentTypeId>,
-    raw_types: Vec<TypeId>,
-    // 只需要get_index就行
-    sparse: HashMap<EntityId, usize>,
-    entities: Vec<EntityId>,
-    storages: Vec<Box<dyn DynTypeVec>>,
+struct Storage {
+    component_type_id: ComponentTypeId,
+    data: Box<dyn DynTypeVec>
 }
 
+pub struct Archetype {
+    sparse: HashMap<EntityId,usize>,
+    entities: Vec<EntityId>,
+    storages: Vec<Storage>,
+}
+
+// Safe functions
 impl Archetype {
-    /// 创建一个空的Archetype
-    /// # Remarks
-    /// 该方法可由xecs自动调用。一般只有在FFI时需要使用
-    pub fn new() -> Self {
+    /// Create an empty archetype
+    pub(crate) fn new() -> Archetype {
         Archetype {
-            types: Vec::new(),
-            raw_types: Vec::new(),
             sparse: HashMap::new(),
             entities: Vec::new(),
             storages: Vec::new(),
         }
     }
 
-    /// 添加一个storage到archetype中
-    pub(in crate) fn add_storage(&mut self,component_id: ComponentTypeId, storage: Box<dyn DynTypeVec>) {
-        self.types.push(component_id);
-        self.raw_types.push(storage.type_id());
-        self.storages.push(storage);
-    }
-
-    /// 在Archetype中创建一个storage
+    /// Create a new storage in Archetype
     /// # Details
-    /// * `T`是实际的储存类型
-    /// * `component_id`是id，可以用来储存外部类型
-    /// # Remarks
-    /// 该方法可由xecs自动调用。一般只有在FFI时需要使用
-    pub(in crate) fn create_storage<T: Component>(&mut self, component_id: ComponentTypeId) {
-        let storage = Vec::<T>::new();
-        self.add_storage(component_id, Box::new(storage));
+    /// * The storages in archetype will be sorted by `component_type_id`
+    /// * `storage` must be empty
+    pub(crate) fn create_storage(&mut self, component_type_id: ComponentTypeId, storage: Box<dyn DynTypeVec>) {
+        let storage = Storage {
+            component_type_id,
+            data: storage,
+        };
+        // get the index that storage will be inserted
+        let index = match self.storages.binary_search_by_key(&component_type_id,|storage|storage.component_type_id) {
+            Ok(index) => index,
+            Err(index) => index,
+        };
+        self.storages.insert(index, storage)
     }
 
-    /// 创建一个用于Rust类型的storage
-    /// # Remarks
-    /// 该方法可由xecs自动调用。一般只有在FFI时需要使用
-    pub(in crate) fn create_rust_storage<T: Component>(&mut self) {
-        let cid = ComponentTypeId::from_rust_type::<T>();
-        self.create_storage::<T>(cid);
+    pub(crate) fn create_rust_storage<T: Component>(&mut self) {
+        let component_type_id = ComponentTypeId::from_rust_type::<T>();
+        let storage = Box::new(Vec::<T>::new());
+        self.create_storage(component_type_id, storage)
     }
 
-    /// 获得Archetype中元素个数
+    /// Check archetype is empty
+    pub fn is_empty(&self) -> bool {
+        self.sparse.is_empty()
+    }
+
+    /// Get the count of entities in Archetype
     pub fn len(&self) -> usize {
         self.entities.len()
     }
 
-    /// 获得Archetype中储存的元素`ComponentTypeId`
-    pub fn types(&self) -> &[ComponentTypeId] {
-        &self.types
-    }
-
-    /// 获得Archetype中每个容器的实际储存数据的类型
-    pub fn raw_types(&self) -> &[TypeId] {
-        &self.raw_types
-    }
-
-    /// 获得Archetype中所有entity的id
-    pub fn ids(&self) -> &[EntityId] {
-        &self.entities
-    }
-
-    /// 判断Archetype是否为空
-    pub fn is_empty(&self) -> bool {
-        self.entities.is_empty()
-    }
-
-    /// 检查Archetype有没有指定的entity
-    pub fn contains(&self, entity_id: EntityId) -> bool {
-        self.entities.contains(&entity_id)
-    }
-
-    /// 检查Archetype中是否包含储存`component_id`指定类型的storage
-    pub fn contains_storage(&self, component_id: ComponentTypeId) -> bool {
-        self.types.contains(&component_id)
-    }
-
-    /// 检查Archetype中是否包含储存`component_ids`中所有的storage
-    pub fn contains_storages(&self, component_ids: &[ComponentTypeId]) -> bool {
-        for id in component_ids {
-            if !self.contains_storage(*id) {
-                return false;
-            }
-        }
-        true
-    }
-
-    /// 获得entity在Archetype中的index
+    /// Get the index of entity in Archetype by its id
     pub fn get_index(&self, entity_id: EntityId) -> Option<usize> {
         self.sparse.get(&entity_id).copied()
     }
 
-    /// 获得所有的storages
-    pub fn all_storages_ref(&self) -> &[Box<dyn DynTypeVec>] {
-        &self.storages
+    /// Check an entity is in archetype
+    pub fn contains(&self, entity_id: EntityId) -> bool {
+        self.sparse.contains_key(&entity_id)
     }
 
-    /// 获得所有的storages
-    pub fn all_storages_mut(&mut self) -> &mut [Box<dyn DynTypeVec>] {
-        &mut self.storages
+    /// Get all ids in Archetype
+    pub fn ids(&self) -> &'_ [EntityId] {
+        &self.entities
     }
 
-    /// 根据component_id获得storage
-    pub fn storage_ref(&self,component_id: ComponentTypeId) -> Option<&dyn DynTypeVec> {
-        let index = self.types.iter()
-            .enumerate()
-            .find(|(_,cid)|**cid == component_id)
-            .map(|(index,_)|index)?;
-        Some(unsafe {
-            self.storages.get_unchecked(index)
-        }.as_ref())
+    /// Get all component_type_id of storages in archetype
+    pub fn component_type_ids(&self) -> impl Iterator<Item = ComponentTypeId> + '_ {
+        self.storages.iter().map(|storage|storage.component_type_id)
     }
 
-    /// 根据component_id获得storage
-    pub fn storage_mut(&mut self,component_id: ComponentTypeId) -> Option<&mut dyn DynTypeVec> {
-        let index = self.types.iter()
-            .enumerate()
-            .find(|(_,cid)|**cid == component_id)
-            .map(|(index,_)|index)?;
-        Some(unsafe {
-            self.storages.get_unchecked_mut(index)
-        }.as_mut())
+    /// Get the real type of data stored in storage in Archetype
+    pub fn types(&self) -> impl Iterator<Item = TypeId> + '_ {
+        self.storages.iter().map(|storage|storage.data.type_id())
     }
 
-    /// 插入buffer中的数据到Archetype中
+    /// Get the storage of archetype by component_type_id
+    pub fn storage_ref(&self, component_type_id: ComponentTypeId) -> Option<&'_ dyn DynTypeVec> {
+        match self.storages.binary_search_by_key(&component_type_id, |storage| storage.component_type_id) {
+            Ok(index) => unsafe {
+                Some(&*self.storages.get_unchecked(index).data)
+            },
+            Err(_) => None,
+        }
+    }
+
+    /// Get the storage of archetype by component_type_id
+    pub fn storage_mut(&mut self, component_type_id: ComponentTypeId) -> Option<&'_ mut dyn DynTypeVec> {
+        match self.storages.binary_search_by_key(&component_type_id, |storage| storage.component_type_id) {
+            Ok(index) => unsafe {
+                Some(&mut *self.storages.get_unchecked_mut(index).data)
+            },
+            Err(_) => None,
+        }
+    }
+
+    pub fn insert<T: crate::tuple::Tuple>(&mut self, entity_id: EntityId, data: T) -> Option<T>{
+        let mut ptrs = vec![std::ptr::null(); data.len()];
+        data.get_ptrs(&mut ptrs);
+
+        if self.contains(entity_id) {
+            let mut out_ptrs = vec![std::ptr::null(); self.storages.len()];
+            unsafe {
+                self.get_mut_ptr_unchecked(entity_id, &mut out_ptrs);
+
+                let out = T::from_ptrs(out_ptrs);
+                self.insert_any_and_forget_unchecked(entity_id, ptrs);
+                std::mem::forget(data);
+                Some(out)
+            }
+        } else {
+            let mut ptrs = vec![std::ptr::null(); self.storages.len()];
+            unsafe {
+                self.get_mut_ptr_unchecked(entity_id, &mut ptrs);
+
+                let out = T::from_ptrs(ptrs);
+                self.insert_any_and_drop_unchecked(entity_id, ptrs);
+                std::mem::forget(data);
+                Some(out)
+            }
+        }
+    }
+}
+
+// Unsafe functions
+impl Archetype {
+
+    /// Insert data in `data_ptrs` to Archetype
     /// # Remarks
-    /// 如果已存在id，则之前的数据将会被`drop`
+    /// If `entity_id` exists, the data will be `forget`
     /// # Safety
-    /// * `data_ptrs`中每一个指针必须有效
-    /// * `data_ptrs`中的每一个指针指向的数据类型必须与`self.raw_types()`中元素类型对应相同（顺序也相同）
-    /// * 在调用该方法之后,`data_ptrs`中的每一个指针指向的内容都不应该被使用（`drop`也是一种使用，请调用`forget`以防止`drop`）
+    /// * All pointer in `data_ptrs` must be valid
+    /// * `data_ptrs` must has same length and order as `types()`
+    /// * All data in `data_ptrs` cannot be used after this call (include `drop`, please `forget` them)
     pub unsafe fn insert_any_and_drop_unchecked(
         &mut self,
         entity_id: EntityId,
@@ -161,7 +149,7 @@ impl Archetype {
             for i in 0..data_ptrs.len() {
                 let ptr = *data_ptrs.get_unchecked(i);
                 let storage = self.storages.get_unchecked_mut(i);
-                storage.replace_any_and_drop_unchecked(index, ptr);
+                storage.data.replace_any_and_drop_unchecked(index, ptr);
             }
         } else {
             self.sparse.insert(entity_id, self.len());
@@ -169,18 +157,18 @@ impl Archetype {
             for i in 0..data_ptrs.len() {
                 let ptr = *data_ptrs.get_unchecked(i);
                 let storage = self.storages.get_unchecked_mut(i);
-                storage.push_any_unchecked(ptr);
+                storage.data.push_any_unchecked(ptr);
             }
         };
     }
 
-    /// 插入buffer中的数据到Archetype中
+    /// Insert data in `data_ptrs` to Archetype
     /// # Remarks
-    /// 如果已存在id，则之前的数据将会被`forget`
+    /// If `entity_id` exists, the data will be `forget`
     /// # Safety
-    /// * `data_ptrs`中每一个指针必须有效
-    /// * `data_ptrs`中的每一个指针指向的数据类型必须与`self.raw_types()`中元素类型对应相同（顺序也相同）
-    /// * 在调用该方法之后,`data_ptrs`中的每一个指针指向的内容都不应该被使用（`drop`也是一种使用，请调用`forget`以防止`drop`）
+    /// * All pointer in `data_ptrs` must be valid
+    /// * `data_ptrs` must has same length and order as `types()`
+    /// * All data in `data_ptrs` cannot be used after this call (include `drop`, please `forget` them)
     pub unsafe fn insert_any_and_forget_unchecked(
         &mut self,
         entity_id: EntityId,
@@ -190,7 +178,7 @@ impl Archetype {
             for i in 0..data_ptrs.len() {
                 let ptr = *data_ptrs.get_unchecked(i);
                 let storage = self.storages.get_unchecked_mut(i);
-                storage.replace_any_and_forget_unchecked(index, ptr);
+                storage.data.replace_any_and_forget_unchecked(index, ptr);
             }
         } else {
             self.sparse.insert(entity_id, self.len());
@@ -198,20 +186,19 @@ impl Archetype {
             for i in 0..data_ptrs.len() {
                 let ptr = *data_ptrs.get_unchecked(i);
                 let storage = self.storages.get_unchecked_mut(i);
-                storage.push_any_unchecked(ptr);
+                storage.data.push_any_unchecked(ptr);
             }
         };
     }
 
-    /// 插入大量数据到Archetype中
+    /// Insert a lot of data to Archetype
     /// # Details
-    /// `ids`和`data`中的数据都会被移动到Archetype中
+    /// `ids` and pointers in `data` will be moved to archetype
     /// # Safety
-    /// * Archetype中不能存在`ids`中的id
-    /// * `ids`和`data`中的所有`DynTypeVec`必须一样长
-    /// * `data`必须和`types`长度相同
-    /// * `data`中每个`DynTypeVec`的`type_id`方法必须和Archetype中storages的`type_id`返回值相同，且顺序一致
-    /// * `data`中所有指针必须有效
+    /// * All id in `ids` must be insert to archetype firstly
+    /// * `ids.len()` must equal to all `DynTypeVec` in data
+    /// * `data` must has same types order and length as `Archetype`
+    /// * all pointers in `data` must be valid
     pub unsafe fn insert_any_batch_unchecked(
         &mut self,
         ids: &mut Vec<EntityId>,
@@ -229,15 +216,15 @@ impl Archetype {
             let data = *data.get_unchecked(i);
             let storage = self.storages.get_unchecked_mut(i);
 
-            storage.append_any_unchecked(&mut *data);
+            storage.data.append_any_unchecked(&mut *data);
         }
     }
 
-    /// 从Archetype中移除数据
+    /// Remove data from archetype
     /// # Remarks
-    /// 被移除的数据将会被`drop`
+    /// * The removed data will be `drop`
     /// # Safety
-    /// * `entity_id`必须存在于archetype中
+    /// * `entity_id` must exist in archetype
     pub unsafe fn remove_and_drop_unchecked(&mut self, entity_id: EntityId) {
         let index = self.sparse.get(&entity_id).copied().unwrap_unchecked();
         if index != self.len() {
@@ -247,21 +234,21 @@ impl Archetype {
             let last_index = self.len() - 1;
             self.entities.swap(index, last_index);
             for storage in &mut self.storages {
-                storage.swap(index, last_index)
+                storage.data.swap(index, last_index)
             }
         }
         self.sparse.remove(&entity_id);
         self.entities.pop();
         for storage in &mut self.storages {
-            storage.pop_and_drop()
+            storage.data.pop_and_drop()
         }
     }
 
-    /// 从Archetype中移除数据
+    /// Remove data from archetype
     /// # Remarks
-    /// 被移除的数据将会被`drop`
+    /// * The removed data will be `forget`
     /// # Safety
-    /// * `entity_id`必须存在于archetype中
+    /// * `entity_id` must exist in archetype
     pub unsafe fn remove_and_forget_unchecked(&mut self, entity_id: EntityId) {
         let index = self.sparse.get(&entity_id).copied().unwrap_unchecked();
         if index != self.len() {
@@ -271,21 +258,21 @@ impl Archetype {
             let last_index = self.len() - 1;
             self.entities.swap(index, last_index);
             for storage in &mut self.storages {
-                storage.swap(index, last_index)
+                storage.data.swap(index, last_index)
             }
         }
         self.sparse.remove(&entity_id);
         self.entities.pop();
         for storage in &mut self.storages {
-            storage.pop_and_forget()
+            storage.data.pop_and_forget()
         }
     }
 
-    /// 移除Archetype中的一段数据
+    /// Remove a range of data in Archetype
     /// # Details
-    /// 被移除的数据会装在Vec里返回
+    /// * All data will be packed in Vec and returned
     /// # Safety
-    /// * `range`必须在范围内
+    /// * `range` must be valid
     pub unsafe fn remove_batch_unchecked(&mut self, range: Range<usize>) -> (Vec<EntityId>,Vec<Box<dyn DynTypeVec>>){
         let removed_ids = {
             let mut removed_ids = self.entities.split_off(range.start);
@@ -299,58 +286,38 @@ impl Archetype {
         }
 
         let removed_data = self.storages.iter_mut()
-            .map(|storage| storage.remove_range(range.clone()))
+            .map(|storage| storage.data.remove_range(range.clone()))
             .collect::<Vec<_>>();
         (removed_ids,removed_data)
     }
 
-    /// 获得Archetype中entity_id对应数据
+    /// Get data of entity in archetype
     /// # Details
-    /// 每个Component的指针会被写入到`data_ptrs`中
+    /// * all pointer of data will be write to `data_ptrs`
     /// # Safety
-    /// * `entity_id`必须存在于Archetype中
-    /// * `data_ptrs.len() == self.types().len()`
+    /// * `entity_id` must exists in archetype
+    /// * `data_ptrs.len() >= self.types().len()`
     pub unsafe fn get_ptr_unchecked(&self, entity_id: EntityId, data_ptrs: &mut [*const u8]) {
         let index = self.sparse.get(&entity_id).copied().unwrap_unchecked();
         for i in 0..self.storages.len() {
             let storage = self.storages.get_unchecked(i);
-            let ptr = storage.get_ptr_unchecked(index);
+            let ptr = storage.data.get_ptr_unchecked(index);
             *data_ptrs.get_unchecked_mut(i) = ptr;
         }
     }
 
-    /// 获得Archetype中entity_id对应数据
+    /// Get the data of entity in archetype
     /// # Details
-    /// 每个Component的指针会被写入到`data_ptrs`中
+    /// * all pointer of data will be write to `data_ptrs`
     /// # Safety
-    /// * `entity_id`必须存在于Archetype中
-    /// * `data_ptrs.len() == self.types().len()`
+    /// * `entity_id` must exists in archetype
+    /// * `data_ptrs.len() >= self.types().len()`
     pub unsafe fn get_mut_ptr_unchecked(&mut self, entity_id: EntityId, data_ptrs: &mut [*mut u8]) {
         let index = self.sparse.get(&entity_id).copied().unwrap_unchecked();
         for i in 0..self.storages.len() {
             let storage = self.storages.get_unchecked_mut(i);
-            let ptr = storage.get_mut_ptr_unchecked(index);
+            let ptr = storage.data.get_mut_ptr_unchecked(index);
             *data_ptrs.get_unchecked_mut(i) = ptr;
         }
-    }
-
-}
-
-impl PartialEq for Archetype {
-    fn eq(&self, other: &Self) -> bool {
-        for ty in &self.types {
-            if !other.contains_storage(*ty) {
-                return false;
-            }
-        }
-        true
-    }
-}
-
-impl Eq for Archetype { }
-
-impl Hash for Archetype {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.types.hash(state);
     }
 }
