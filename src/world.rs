@@ -78,7 +78,7 @@ impl World {
         archetypes.push((component_ids,RwLock::new(archetype)));
     }
 
-    /// 创建一个entity并返回该entity的hanle以方便操作
+    /// 创建一个entity并返回该entity的handle以方便操作
     pub fn create_entity(&self) -> Entity<'_> {
         todo!()
     }

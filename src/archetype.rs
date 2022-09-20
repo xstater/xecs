@@ -20,7 +20,7 @@ pub struct Archetype {
 
 impl Archetype {
     /// 创建一个空的Archetype
-    /// # Remakrs
+    /// # Remarks
     /// 该方法可由xecs自动调用。一般只有在FFI时需要使用
     pub fn new() -> Self {
         Archetype {
