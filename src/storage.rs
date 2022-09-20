@@ -99,6 +99,7 @@ impl Storages {
     /// Get all locks
     /// # Details
     /// * It sort the locks by StorageId to avoid dead-lock
+    /// * all functions can only get locks from this function, it ensured the order of locks
     /// # Safety
     /// * All id in `storage_ids` must exists in `Storages`
     /// * `storage_ids` cannot has repeat id
@@ -226,11 +227,13 @@ impl Storages {
         entity_id: EntityId,
     ) {
         let sub_graph_storages = self.sub_graph_of(storage_id);
-        let read_locks = self.read_locks(sub_graph_storages.into_iter());
+        let read_locks = self.locks(sub_graph_storages.into_iter().map(|id|(id,false)));
 
         let mut need_upgrade = Vec::new();
 
         let roots = self.roots_of(storage_id);
+
+        
 
 
     }
