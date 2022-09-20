@@ -227,13 +227,11 @@ impl Storages {
         entity_id: EntityId,
     ) {
         let sub_graph_storages = self.sub_graph_of(storage_id);
-        let read_locks = self.locks(sub_graph_storages.into_iter().map(|id|(id,false)));
+        let (read_locks,_) = self.locks(sub_graph_storages.into_iter().map(|id|(id,false)));
 
         let mut need_upgrade = Vec::new();
 
         let roots = self.roots_of(storage_id);
-
-        
 
 
     }
