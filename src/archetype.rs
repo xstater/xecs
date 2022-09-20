@@ -1,10 +1,15 @@
 mod iter;
-mod guard;
+mod guards;
 #[cfg(test)]
 mod tests;
 
 use crate::{dyn_type_vec::DynTypeVec, Component, ComponentTypeId, EntityId};
 use std::{any::TypeId, collections::HashMap, ops::Range, hash::Hash};
+
+pub use guards::{
+    ArchetypeRead,
+    ArchetypeWrite
+};
 
 /// 具有相同Component组合类型的entity的容器
 /// # Remarks
