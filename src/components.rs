@@ -1,3 +1,5 @@
+mod sparse_set;
+
 use crate::EntityId;
 /// Component in XECS is just anything that implements `Send + Sync`
 pub trait Component: Send + Sync + 'static {}
