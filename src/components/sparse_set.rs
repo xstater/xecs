@@ -12,7 +12,7 @@ where
     type Item = T;
 
     fn len(&self) -> usize {
-        todo!()
+        SparseSet::len(self)
     }
 
     fn contains(&self, entity_id: EntityId) -> bool {
@@ -27,39 +27,45 @@ where
         SparseSet::get_id(self, index)
     }
 
-    fn remove(&mut self, entity_id: EntityId) -> Option<Self::Item> {
-        SparseSet::remove(self, entity_id)
+    fn remove_by_id(&mut self, entity_id: EntityId) -> Option<Self::Item> {
+        SparseSet::swap_remove_by_id(self, entity_id)
     }
 
-    unsafe fn swap_by_index_unchecked(&mut self, index_a: usize, index_b: usize) {
-        SparseSet::swap_by_index_unchecked(self, index_a, index_b)
+    fn remove_by_index(&mut self, index: usize) -> Option<Self::Item> {
+        SparseSet::swap_remove_by_index(self,index)
+    }
+
+    fn swap_by_index(&mut self, index_a: usize, index_b: usize) {
+        SparseSet::swap_by_index(self, index_a, index_b)
     }
 
     fn swap_by_id(&mut self, id_a: EntityId, id_b: EntityId) {
         SparseSet::swap_by_entity_id(self, id_a, id_b)
     }
 
-    fn insert(&mut self,id: EntityId, data: Self::Item) -> Option<Self::Item> {
-        SparseSet::insert(self, id, data)
+    fn insert(&mut self,id: EntityId, data: Self::Item){
+        SparseSet::insert(self, id, data);
     }
 
-    fn insert_batch(&mut self, ids: &[EntityId], data: Vec<Self::Item>) {
-        SparseSet::insert_batch(self, ids, data)
+    fn insert_batch(&mut self, ids: Vec<EntityId>, data: Vec<Self::Item>) {
+        let mut ids = ids;
+        let mut data = data;
+        SparseSet::insert_batch(self, &mut ids, &mut data)
     }
 
     fn get(&self, id: EntityId) -> Option<&Self::Item> {
-        todo!()
+        SparseSet::get(self, id)
     }
 
     fn get_mut(&mut self, id: EntityId) -> Option<&mut Self::Item> {
-        todo!()
+        SparseSet::get_mut(self, id)
     }
 
     fn ids(&self) -> &[EntityId] {
-        todo!()
+        SparseSet::ids(self)
     }
 
     fn data(&self) -> &[Self::Item] {
-        todo!()
+        SparseSet::data(self)
     }
 }
